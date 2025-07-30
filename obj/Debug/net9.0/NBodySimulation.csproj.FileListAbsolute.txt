@@ -1,0 +1,14 @@
+c:\Users\asdf\Documents\NBodySimulation\bin\Debug\net9.0\NBodySimulation.exe
+c:\Users\asdf\Documents\NBodySimulation\bin\Debug\net9.0\NBodySimulation.deps.json
+c:\Users\asdf\Documents\NBodySimulation\bin\Debug\net9.0\NBodySimulation.runtimeconfig.json
+c:\Users\asdf\Documents\NBodySimulation\bin\Debug\net9.0\NBodySimulation.dll
+c:\Users\asdf\Documents\NBodySimulation\bin\Debug\net9.0\NBodySimulation.pdb
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.AssemblyInfoInputs.cache
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.AssemblyInfo.cs
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.csproj.CoreCompileInputs.cache
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.dll
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\refint\NBodySimulation.dll
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.pdb
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\NBodySimulation.genruntimeconfig.cache
+c:\Users\asdf\Documents\NBodySimulation\obj\Debug\net9.0\ref\NBodySimulation.dll
