@@ -6,8 +6,3 @@ interface updateAble
     public void updateMajor();
 }
 
-interface mass
-{
-    public UInt64 gravForce(Body body);
-    //public UInt64 gravAttraction(Mbody body);
-}

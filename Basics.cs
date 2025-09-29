@@ -1,13 +1,12 @@
+using Globals;
 
-using System.Runtime.InteropServices.Swift;
-
-class position
+ public class Position
 {
     private Int64 x;
     private Int64 y;
     private Int64 z;
 
-    public position(Int64 xpos, Int64 ypos, Int64 zpos)
+    public Position(Int64 xpos, Int64 ypos, Int64 zpos)
     {
         this.x = xpos;
         this.y = ypos;
@@ -26,7 +25,7 @@ class position
         this.z = zpos;
     }
 
-    public double distanceToo(position target)
+    public double distanceToo(Position target)
     {
         Int64[] targetcoords = target.getPos();
         UInt64 xdiff = Convert.ToUInt64(this.x - targetcoords[0]);
@@ -38,17 +37,18 @@ class position
     }
 }
 
-class dynamicPosition : position, updateAble
+public class dynamicPosition : Position, updateAble
 {
-    Int64 x;
-    Int64 y;
-    Int64 z;
-    Int64 xvel;
-    Int64 yvel;
-    Int64 zvel;
+    private Int64 x;
+    private Int64 y;
+    private Int64 z;
+    private Int64 xvel;
+    private Int64 yvel;
+    private Int64 zvel;
 
     public dynamicPosition(Int64 xpos, Int64 ypos, Int64 zpos) : base(xpos, ypos, zpos)
     {
+
         this.xvel = 0;
         this.yvel = 0;
         this.zvel = 0;
@@ -84,4 +84,48 @@ class dynamicPosition : position, updateAble
     {
         return [this.xvel, this.yvel, this.zvel];
     }
+}       
+
+
+public abstract class Volume : updateAble
+{
+    public Position Center { get; }
+    public Position COM { get; }
+
+    public float mass { get; }
+
+    public Volume Parent { get; }
+
+    
+
+
+
+    abstract void initialise();
+
+    abstract void injestBody(Body newBody);
+
+    abstract list<Body> getChildren();
+
+
+    abstract void update();
+    abstract void updateMajor();
+
 }
+
+
+class Body
+{
+    protected dynamicPosition pos { get; }
+
+    public ulong radius { get; }
+
+    public Volume parent { get; set; }
+
+    public float mass { get; }
+
+    public bool massive { get; }
+
+
+
+}
+
