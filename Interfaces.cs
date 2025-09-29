@@ -8,6 +8,6 @@ interface updateAble
 
 interface mass
 {
-    public UInt64 gravForce(body body);
-    public UInt64 gravAttraction(Mbody body);
+    public UInt64 gravForce(Body body);
+    //public UInt64 gravAttraction(Mbody body);
 }

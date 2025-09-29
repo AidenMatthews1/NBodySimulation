@@ -8,19 +8,19 @@
     "net9.0": []
   },
   "packageFolders": {
-    "C:\\Users\\asdf\\.nuget\\packages\\": {}
+    "/home/aiden/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\asdf\\Documents\\NBodySimulation\\NBodySimulation.csproj",
+      "projectUniqueName": "/home/aiden/Documents/Coding/NBodySimulation/NBodySimulation.csproj",
       "projectName": "NBodySimulation",
-      "projectPath": "C:\\Users\\asdf\\Documents\\NBodySimulation\\NBodySimulation.csproj",
-      "packagesPath": "C:\\Users\\asdf\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\asdf\\Documents\\NBodySimulation\\obj\\",
+      "projectPath": "/home/aiden/Documents/Coding/NBodySimulation/NBodySimulation.csproj",
+      "packagesPath": "/home/aiden/.nuget/packages/",
+      "outputPath": "/home/aiden/Documents/Coding/NBodySimulation/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\asdf\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "/home/aiden/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
@@ -65,7 +65,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.300/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.305/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

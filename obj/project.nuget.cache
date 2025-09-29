@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "RK03I33g1HE=",
+  "dgSpecHash": "4CG4XvbB+S0=",
   "success": true,
-  "projectFilePath": "C:\\Users\\asdf\\Documents\\NBodySimulation\\NBodySimulation.csproj",
+  "projectFilePath": "/home/aiden/Documents/Coding/NBodySimulation/NBodySimulation.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }
