@@ -205,10 +205,10 @@ public abstract class Volume : updateAble
     protected virtual Position[,,] calculateChildVolumePositions(long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits, out bool BVolumes)
     {
         // In Volume so dont have to rewrite in RVolume and AVolume even though BVolume will never use this
-        // As center 
-        long width = xlen * 2 + 1;
-        long height = ylen * 2 + 1;
-        long depth = zlen * 2 + 1;
+        // + 1 because boundaries are inclusive and can be shared between volumes
+        long width = math.abs(upperXBound - lowerXBound) + 1;
+        long height = math.abs(upperYBound - lowerYBound) + 1;
+        long depth = math.abs(upperZBound - lowerZBound) + 1;
 
         // check that there is enough space to create children
         if (width < numAxisSplits * BVminMagnitude + numAxisSplits || height < numAxisSplits * BVminMagnitude + numAxisSplits || depth < numAxisSplits * BVminMagnitude + numAxisSplits)
