@@ -3,4 +3,4 @@
 using Globals;
 
 Console.WriteLine("Hello, World!");
-Console.WriteLine(Global_Variables.units_in_m);
+Console.WriteLine(globalVariables.units_in_m);
