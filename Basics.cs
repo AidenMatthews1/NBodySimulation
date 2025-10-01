@@ -123,6 +123,7 @@ public class dynamicPosition : Position, updateAble
 public abstract class Volume : updateAble
 {
     public static Volume Parent { get; }
+    public static Position center { get; }
     public static long lowerXBound { get; }
     public static long upperXBound { get; }
     public static long lowerYBound { get; }
@@ -132,7 +133,7 @@ public abstract class Volume : updateAble
     public Position COM { get; }
     public float mass { get { updateMass(); return mass; } }
 
-    public Volume(Position center, Volume parent, Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits)
+    public Volume(Volume parent,Position Center, Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits)
     {
         // It is left to the parent to ensure that there are no overlapping Volumes within itself
         // These checks ensure that the volume hasnt been created out of bounds
@@ -148,6 +149,7 @@ public abstract class Volume : updateAble
         this.mass = 0;
         this.Center = center;
 
+        this.center = Center;
         this.COM = center;
         this.Parent = parent;
 
@@ -157,6 +159,14 @@ public abstract class Volume : updateAble
         upperYBound = UpperYBound;
         lowerZBound = LowerZBound;
         upperZBound = UpperZBound;
+    }
+
+    public Volume(Volume parent,Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits): this (parent, LowerXBound,UpperXBound,LowerYBound,UpperYBound, LowerZBound, UpperZBound, numAxisSplits)
+    {
+        long width = math.abs(upperXBound - lowerXBound) + 1;
+        long height = math.abs(upperYBound - lowerYBound) + 1;
+        long depth = math.abs(upperZBound - lowerZBound) + 1;
+        center = new Position(lowerXBound + (width / 2).ToUInt64, lowerYBound + (height / 2).ToUInt64, lowerZBound + (depth / 2).ToUInt64);
     }
 
     public virtual RVolume getRoot()
@@ -210,27 +220,117 @@ public abstract class Volume : updateAble
         long height = math.abs(upperYBound - lowerYBound) + 1;
         long depth = math.abs(upperZBound - lowerZBound) + 1;
 
+        float BVMagRatio = BVmaxMagnitude / BVminMagnitude;
+
         // check that there is enough space to create children
-        if (width < numAxisSplits * BVminMagnitude + numAxisSplits || height < numAxisSplits * BVminMagnitude + numAxisSplits || depth < numAxisSplits * BVminMagnitude + numAxisSplits)
+        if (width < numAxisSplits * BVminMagnitude || height < numAxisSplits * BVminMagnitude || depth < numAxisSplits * BVminMagnitude)
         {
             throw new ArgumentException("Volume has been asked to create children without enough space");
         }
 
         // check if we are making AVolume or BVolume children
-        if (width >= (numAxisSplits * BVminMagnitude + numAxisSplits) * numAxisSplits && height >= (numAxisSplits * BVminMagnitude + numAxisSplits) * numAxisSplits && depth >= (numAxisSplits * BVminMagnitude + numAxisSplits) * numAxisSplits)
+        if (width >= (numAxisSplits * BVminMagnitude) * numAxisSplits && height >= (numAxisSplits * BVminMagnitude) * numAxisSplits && depth >= (numAxisSplits * BVminMagnitude) * numAxisSplits)
         {
             BVolumes = false;
+
             // Ideally all Volumes should be the same size but for many reasons this may not be the case
             // Volumes further from the center should be larger
             // If possible Volumes closer to the center should be default size
+            // eg if the numaxissplits = 3 then the inner two volumes will be the same standard size (some multiple of BVMinMag)
+            // while the outer will be a non-standard size larger than BVminMag
 
+            // Finding the "level" of volume we are on so we know the size to create the standard size volumes
+
+            // byte xLevel = 1;
+
+            // while (true)
+            // {
+            //     if (width > BVmaxMagnitude + BVminMagnitude *) > 1)
+            // }
 
 
         }
         else
         {
+            // from here on its ASSUMED that we want to create BVolumes
+            // AND there is the correct amount of space to create the correct amount
             BVolumes = true;
+            List<long> xBounds = new List<long>();
+            List<long> yBounds = new List<long>();
+            List<long> zBounds = new List<long>();
+
+            // get direction from root to current Volume to know which side to put the larger child on
+            RVolume root = Parent.getRoot();
+            float[] unitVecTooRoot = root.center.unitVectorToo(this.center);
+            if (unitVecTooRoot[0] > 0) { sbyte xDir = 1; xBounds.Add(this.lowerXBound);}
+            else { sbyte xDir = -1; xBounds.Add(this.upperXBound); }
+            if (unitVecTooRoot[1] > 0) { sbyte yDir = 1; yBounds.Add(this.lowerYBound); }
+            else { sbyte yDir = -1; yBounds.Add(this.upperYBound); }
+            if (unitVecTooRoot[2] > 0) { sbyte zDir = 1; zBounds.Add(this.lowerZBound); }
+            else { sbyte zDir = -1; zBounds.Add(this.upperZBound); }
+
+            // possible to do it without these seemingly redundant fields 
+            // but because of the directionality having them makes the calculations easier
+            long remainingMag = width;
+            while (true)
+            {
+                if (remainingMag > BVmaxMagnitude)
+                {
+                    xBounds.Add(xBounds.Last() + (BVminMagnitude * xDir));
+                    remainingMag = -BVminMagnitude;
+                }
+                if (remainingMag <= BVmaxMagnitude & remainingMag > BVminMagnitude)
+                {
+                    if (remainingMag - BVminMagnitude >= BVminMagnitude)
+                    {
+                        xBounds.Add(xBounds.Last() + (BVminMagnitude * xDir));
+                        remainingMag = -BVminMagnitude;
+                    }
+                    else
+                    {
+                        if (xDir == 1) { xBounds.Add(this.upperXBound); }
+                        else { xBounds.Add(this.lowerXBound); }
+                    }
+                }
+                if (remainingMag < BVminMagnitude)
+                {
+                    throw new ArgumenExeption("Volume calculateChildPositions got itself into an unfixable state (x)");
+                }
+            }
+            
+
+
+
+
+
+
+
+
+
+            long xLeftover = width % BVminMagnitude;
+            long yLeftover = height % BVminMagnitude;
+            long zLeftover = depth % BVminMagnitude;
+
+
+            if (xLeftover > BVmaxMagnitude - BVminMagnitude | yLeftover > BVmaxMagnitude - BVminMagnitude | zLeftover > BVmaxMagnitude - BVminMagnitude)
+            {
+                throw new ArgumentException("Volume asked to create BVolumes with not enough slack");
+            }
+
+            
+
+            
+
+
         }
+
+        
+
+
+
+
+
+
 
         // if doesnt fit nicely must have volumes of mismatched size
         // if (width % numAxisSplits != 0 || height % numAxisSplits != 0 || depth % numAxisSplits != 0)
