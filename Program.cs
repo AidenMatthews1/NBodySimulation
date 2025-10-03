@@ -14,7 +14,6 @@ Console.WriteLine(test.ToString());
 
 
 
-
 // Basic Class Definitions ----------------------------------------------------
 
 public class positioningException : System.Exception
@@ -261,31 +260,51 @@ public abstract class Volume : updateAble
         List<long> yBounds = new List<long>();
         List<long> zBounds = new List<long>();
 
+        // get direction from root to current Volume to know which side to put the larger child on
+        RVolume root = Parent.getRoot();
+        decimal[] unitVecTooRoot = root.Center.unitVectorToo(this.Center);
+
+        // possible to do it without these seemingly redundant fields 
+        // but because of the directionality having them makes the calculations easier
+        sbyte xDir;
+        sbyte yDir;
+        sbyte zDir;
+
+        // Always the boundaries of the current volume will be used for on of the edge children volumes
+        if (unitVecTooRoot[0] > 0) { xDir = 1; xBounds.Add(this.lowerXBound); }
+        else { xDir = -1; xBounds.Add(this.upperXBound); }
+        if (unitVecTooRoot[1] > 0) { yDir = 1; yBounds.Add(this.lowerYBound); }
+        else { yDir = -1; yBounds.Add(this.upperYBound); }
+        if (unitVecTooRoot[2] > 0) { zDir = 1; zBounds.Add(this.lowerZBound); }
+        else { zDir = -1; zBounds.Add(this.upperZBound); }
+
         // check that there is enough space to create children
-        if (width < numAxisSplits * BVminMagnitude || height < numAxisSplits * BVminMagnitude || depth < numAxisSplits * BVminMagnitude)
+        if (width < numAxisSplits * BVminMagnitude | height < numAxisSplits * BVminMagnitude | depth < numAxisSplits * BVminMagnitude)
         {
             throw new ArgumentException("Volume has been asked to create children without enough space");
         }
 
         // check if we are making AVolume or BVolume children
-        if (width >= (numAxisSplits * BVminMagnitude) * numAxisSplits && height >= (numAxisSplits * BVminMagnitude) * numAxisSplits && depth >= (numAxisSplits * BVminMagnitude) * numAxisSplits)
+        if (width >= (numAxisSplits * BVminMagnitude) * numAxisSplits & height >= (numAxisSplits * BVminMagnitude) * numAxisSplits & depth >= (numAxisSplits * BVminMagnitude) * numAxisSplits)
         {
             BVolumes = false;
-
             // Ideally all Volumes should be the same size but for many reasons this may not be the case
             // Volumes further from the center should be larger
             // If possible Volumes closer to the center should be default size
             // eg if the numaxissplits = 3 then the inner two volumes will be the same standard size (some multiple of BVMinMag)
             // while the outer will be a non-standard size larger than BVminMag
 
-            // Finding the "level" of volume we are on so we know the size to create the standard size volumes
+            long xDivision = width / numAxisSplits;
+            long yDivision = height / numAxisSplits;
+            long zDivision = depth / numAxisSplits;
 
-            // byte xLevel = 1;
-
-            // while (true)
-            // {
-            //     if (width > BVmaxMagnitude + BVminMagnitude *) > 1)
-            // }
+            // starts at 1 and is noninclusive < because the edges are already put in Boundary lists through other code
+            for (byte i = 1; i < numAxisSplits; i++)
+            {
+                xBounds.Add(xBounds.Last() + xDivision);
+                yBounds.Add(yBounds.Last() + yDivision);
+                zBounds.Add(zBounds.Last() + zDivision);   
+            }
 
 
         }
@@ -301,23 +320,7 @@ public abstract class Volume : updateAble
             }
 
             BVolumes = true;
-            
 
-            // get direction from root to current Volume to know which side to put the larger child on
-            RVolume root = Parent.getRoot();
-            decimal[] unitVecTooRoot = root.Center.unitVectorToo(this.Center);
-
-            // possible to do it without these seemingly redundant fields 
-            // but because of the directionality having them makes the calculations easier
-            sbyte xDir;
-            sbyte yDir;
-            sbyte zDir;
-            if (unitVecTooRoot[0] > 0) { xDir = 1; xBounds.Add(this.lowerXBound); }
-            else { xDir = -1; xBounds.Add(this.upperXBound); }
-            if (unitVecTooRoot[1] > 0) { yDir = 1; yBounds.Add(this.lowerYBound); }
-            else { yDir = -1; yBounds.Add(this.upperYBound); }
-            if (unitVecTooRoot[2] > 0) { zDir = 1; zBounds.Add(this.lowerZBound); }
-            else { zDir = -1; zBounds.Add(this.upperZBound); }
 
             long remainingMag = width;
             while (true)
@@ -336,8 +339,6 @@ public abstract class Volume : updateAble
                     }
                     else
                     {
-                        if (xDir == 1) { xBounds.Add(this.upperXBound); }
-                        else { xBounds.Add(this.lowerXBound); }
                         break;
                     }
                 }
@@ -364,8 +365,6 @@ public abstract class Volume : updateAble
                     }
                     else
                     {
-                        if (yDir == 1) { yBounds.Add(this.upperYBound); }
-                        else { yBounds.Add(this.lowerYBound); }
                         break;
                     }
                 }
@@ -392,8 +391,6 @@ public abstract class Volume : updateAble
                     }
                     else
                     {
-                        if (zDir == 1) { zBounds.Add(this.upperZBound); }
-                        else { zBounds.Add(this.lowerZBound); }
                         break;
                     }
                 }
@@ -404,12 +401,18 @@ public abstract class Volume : updateAble
             }
 
         }
-        // if doesnt fit nicely must have volumes of mismatched size
-        // if (width % numAxisSplits != 0 || height % numAxisSplits != 0 || depth % numAxisSplits != 0)
-        // {
 
+        if (xDir == 1) { xBounds.Add(this.upperXBound); }
+        else { xBounds.Add(this.lowerXBound); }
+        if (yDir == 1) { yBounds.Add(this.upperYBound); }
+        else { yBounds.Add(this.lowerYBound); }
+        if (zDir == 1) { zBounds.Add(this.upperZBound); }
+        else { zBounds.Add(this.lowerZBound); }
 
-        // }
+        if (xBounds.Count() < 2 | yBounds.Count() < 2 | zBounds.Count() < 2)
+        {
+            throw new IndexOutOfRangeException($"Calculate Child Volumes couldnt create enough bounds on atleast 1 axis {this.ToString()}");
+        }
         List<long>[] temp = { xBounds, yBounds, zBounds };
         return temp;
     }
@@ -513,7 +516,7 @@ public class RVolume : Volume
     public int Timestep { get; private set; }
 
     // Accessing the Parent doesnt make sense and its set to itself or null anyway
-    override public Volume? Parent { get { throw new InvalidOperationException("Tried to access RVolume Parent"); } }
+    override public Volume? Parent { get { Debug.WriteLine("Tried to access RVolume Parent"); return this; } }
 
     private RVolume(long xlen, long ylen, long zlen)
     {
@@ -537,37 +540,16 @@ public class RVolume : Volume
         this.Parent = null;
     }
 
-    public RVolume(long xlen, long ylen, long zlen, long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits) : this(xlen, ylen, zlen)
+    public RVolume(long xlen, long ylen, long zlen, long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits) : this(xlen, ylen, zlen, BVminMagnitude, BVmaxMagnitude, numAxisSplits, numAxisSplits)
     {
 
-        bool BVolumes = false;
-        List<long>[] boundaries = calculateChildVolumePositions(BVminMagnitude, BVmaxMagnitude, numAxisSplits, out BVolumes);
-        if (BVolumes)
-        {
-            throw new ArgumentException("RVolume was created without enough space");
-        }
-
-        List<long> xBoundary = boundaries[0];
-        List<long> yBoundary = boundaries[1];
-        List<long> zBoundary = boundaries[2];
-        for (int x = 0; x < xBoundary.Count(); x++)
-        {
-            for (int y = 0; y < yBoundary.Count(); y++)
-            {
-                for (int z = 0; z < zBoundary.Count(); z++)
-                {
-                    Children.Add(new AVolume(this, xBoundary[x], xBoundary[x + 1], yBoundary[y], yBoundary[y + 1], zBoundary[z], zBoundary[z + 1], numAxisSplits));
-                    Console.WriteLine("Made it here");
-                }
-            }
-        }
     }
 
     public RVolume(long xlen, long ylen, long zlen, long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits, byte RVolumeSplits) : this(xlen, ylen, zlen)
     {
         // length of each axis must be atleast numberVolumeSplits^2 as we need Avolume and BVolume layer below RVolume
         // Length of each axis must be at MOST half the max value of long
-
+        Children = new List<AVolume>();
         bool BVolumes = false;
         List<long>[] boundaries = calculateChildVolumePositions(BVminMagnitude, BVmaxMagnitude, RVolumeSplits, out BVolumes);
         if (BVolumes)
@@ -578,13 +560,18 @@ public class RVolume : Volume
         List<long> xBoundary = boundaries[0];
         List<long> yBoundary = boundaries[1];
         List<long> zBoundary = boundaries[2];
+        foreach (long x in xBoundary)
+        {
+            Console.WriteLine(x);
+        }
+        
         for (int x = 0; x < xBoundary.Count(); x++)
         {
             for (int y = 0; y < yBoundary.Count(); y++)
             {
                 for (int z = 0; z < zBoundary.Count(); z++)
                 {
-                    Children.Add(new AVolume(this, xBoundary[x], xBoundary[x + 1], yBoundary[y], yBoundary[y + 1], zBoundary[z], zBoundary[z + 1], numAxisSplits));
+                    Children.Add(new AVolume(this, BVminMagnitude, BVmaxMagnitude, xBoundary[x], xBoundary[x + 1], yBoundary[y], yBoundary[y + 1], zBoundary[z], zBoundary[z + 1], numAxisSplits));
                 }
             }
         }
@@ -592,7 +579,7 @@ public class RVolume : Volume
 
     public override global::System.String ToString()
     {
-        return $"Root RVolume with Direct children currently on Timestep {Timestep}.";
+        return $"Root RVolume with {Children.Count()} Direct children containing {getContainedBodies().Count()} bodies, currently on Timestep {Timestep}.";
     }
 
     public override void initialise()
@@ -689,10 +676,37 @@ public class AVolume : Volume
 {
     public List<Volume> Children { get; private set; }
 
-    public AVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound, numAxisSplits)
+    public AVolume(Volume cParent, long BVminMagnitude, long BVmaxMagnitude, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound, numAxisSplits)
     {
-        
+        Children = new List<Volume>();
+
+        bool BVolumes = false;
+        List<long>[] boundaries = calculateChildVolumePositions(BVminMagnitude, BVmaxMagnitude, numAxisSplits, out BVolumes);
+
+        List<long> xBoundary = boundaries[0];
+        List<long> yBoundary = boundaries[1];
+        List<long> zBoundary = boundaries[2];
+
+        for (int x = 0; x < xBoundary.Count(); x++)
+        {
+            for (int y = 0; y < yBoundary.Count(); y++)
+            {
+                for (int z = 0; z < zBoundary.Count(); z++)
+                {
+                    if (BVolumes)
+                    {
+                        Children.Add(new BVolume(this, xBoundary[x], xBoundary[x + 1], yBoundary[y], yBoundary[y + 1], zBoundary[z], zBoundary[z + 1]));
+
+                    }
+                    else
+                    {
+                        Children.Add(new AVolume(this, BVminMagnitude, BVmaxMagnitude, xBoundary[x], xBoundary[x + 1], yBoundary[y], yBoundary[y + 1], zBoundary[z], zBoundary[z + 1], numAxisSplits));
+                    }
+                }
+            }
+        }    
     }
+    
     // public List<BVolume> getBVolumes()
     // {
     //     return new List<BVolume>();
