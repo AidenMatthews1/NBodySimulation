@@ -1,19 +1,19 @@
 using Globals;
+//using System;
 
 public class positioningException : System.Exception
 {
-    public string message { get; } = "Position in spot that should not be possible";
-    public Position offender { get; }
-    public positioningException(Position Offender)
+    public string Message { get; } = "Position in spot that should not be possible";
+    public Position Offender { get; }
+    public positioningException(Position cOffender)
     {
-        offender = Offender;
+        Offender = cOffender;
     }
-    public positioningException(Position Offender, string Message)
+    public positioningException(Position cOffender, string cMessage) : this(cOffender)
     {
-        offender = Offender;
-        message = Message;
+        Message = cMessage;
     }
-    public positioningException(string message, System.Exception inner) : base(message, inner) { }
+    public positioningException(string Message, System.Exception inner) : base(Message, inner) { }
     protected positioningException(
         System.Runtime.Serialization.SerializationInfo info,
         System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
@@ -21,9 +21,9 @@ public class positioningException : System.Exception
 
 public class Position
 {
-    public Int64 x { get; }
-    public Int64 y { get; }
-    public Int64 z { get; }
+    public Int64 x { get; protected set; }
+    public Int64 y { get; protected set; }
+    public Int64 z { get; protected set; }
 
     public Position(Int64 xpos, Int64 ypos, Int64 zpos)
     {
@@ -55,22 +55,23 @@ public class Position
         return magnitude;
     }
 
-    public float[3] unitVectorToo(Position target)
+    public decimal[] unitVectorToo(Position target)
     {
         long xDifference = this.x - target.x;
         long yDifference = this.y - target.y;
         long zDifference = this.z - target.z;
-        float magnitude = (x ^ 2 + y ^ 2 + z ^ 2) ^ 0.5;
-        return new float[3] = [xDifference / magnitude, yDifference / magnitude, zDifference / magnitude];
+        double magnitude = Convert.ToDouble(Math.Sqrt(x ^ 2 + y ^ 2 + z ^ 2));
+        decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
+        return temp;
     }
 }
 
 public class dynamicPosition : Position, updateAble
 {
-    public Int64 xvel { get; }
-    public Int64 yvel { get; }
-    public Int64 zvel { get; }
-    public float magnitudeVel { get{ updateMagnitude(); return magnitudeVel; } }
+    public Int64 xvel { get; protected set; }
+    public Int64 yvel { get; protected set; }
+    public Int64 zvel { get; protected set; }
+    //public float magnitudeVel { get { return calcMagnitude(); } protected set; }
 
     public dynamicPosition(Int64 xpos, Int64 ypos, Int64 zpos) : base(xpos, ypos, zpos)
     {
@@ -78,7 +79,6 @@ public class dynamicPosition : Position, updateAble
         this.xvel = 0;
         this.yvel = 0;
         this.zvel = 0;
-        this.magnitude = 0;
     }
 
     public dynamicPosition(Int64 xpos, Int64 ypos, Int64 zpos, Int64 xveloc, Int64 yveloc, Int64 zveloc) : base(xpos, ypos, zpos)
@@ -86,7 +86,6 @@ public class dynamicPosition : Position, updateAble
         this.xvel = xveloc;
         this.yvel = yveloc;
         this.zvel = zveloc;
-        updateMagnitude();
     }
 
     public void update()
@@ -113,45 +112,37 @@ public class dynamicPosition : Position, updateAble
     //     return [this.xvel, this.yvel, this.zvel];
     // }
 
-    protected void updateMagnitude()
+    protected double calcMagnitude()
     {
-        this.magnitudeVel = (xvel ^ 2 + yvel ^ 2 + zvel ^ 2) ^ 0.5;
+        return Math.Sqrt(xvel ^ 2 + yvel ^ 2 + zvel ^ 2);
     }
 }
 
-
 public abstract class Volume : updateAble
 {
-    public static Volume Parent { get; }
-    public static Position center { get; }
-    public static long lowerXBound { get; }
-    public static long upperXBound { get; }
-    public static long lowerYBound { get; }
-    public static long upperYBound { get; }
-    public static long lowerZBound { get; }
-    public static long upperZBound { get; }
-    public Position COM { get; }
-    public float mass { get { updateMass(); return mass; } }
+    public virtual Volume Parent { get; protected set;}
+    public Position Center { get; protected set;}
 
-    public Volume(Volume parent,Position Center, Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits)
+    // For the boudaries LowerBound is CLOSEST to RVolume center not most negative
+    // In all cases RVolume center can be assumed to be 0 
+    public long lowerXBound { get; protected set;}
+    public long upperXBound { get; protected set;}
+    public long lowerYBound { get; protected set;}
+    public long upperYBound { get; protected set;}
+    public long lowerZBound { get; protected set;}
+    public long upperZBound { get; protected set;}
+    public Position COM { get; protected set; }
+    public float Mass { get; protected set; }
+
+    // public Volume(Volume parent,Position Center, Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits)
+    // {
+
+    // }
+
+    protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound)
     {
-        // It is left to the parent to ensure that there are no overlapping Volumes within itself
-        // These checks ensure that the volume hasnt been created out of bounds
-        if (!parent.withinBoundaries(center))
-        {
-            throw new positioningException(center, "Attempted volume creation outside parent bounds");
-        }
-        if (!parent.withinBoundaries(new Position(center.x + xlen, center.y + ylen, center.z + zlen)) | !parent.withinBoundaries(new Position(center.x - xlen, center.y - ylen, center.z - zlen)))
-        {
-            throw new positioningException(center, "Attempted volume creation with bounds outside parent");
-        }
-
-        this.mass = 0;
-        this.Center = center;
-
-        this.center = Center;
-        this.COM = center;
-        this.Parent = parent;
+        this.Mass = 0;
+        this.Parent = cParent;
 
         lowerXBound = LowerXBound;
         upperXBound = UpperXBound;
@@ -159,15 +150,28 @@ public abstract class Volume : updateAble
         upperYBound = UpperYBound;
         lowerZBound = LowerZBound;
         upperZBound = UpperZBound;
+
+        long width = Math.Abs(upperXBound - lowerXBound) + 1;
+        long height = Math.Abs(upperYBound - lowerYBound) + 1;
+        long depth = Math.Abs(upperZBound - lowerZBound) + 1;
+        // TODO this is wrong it should take into account directionality to Root to check which bound to use
+        this.Center = new Position(lowerXBound + (width / 2), lowerYBound + (height / 2), lowerZBound + (depth / 2));
+        this.COM = Center;
+
+        // It is left to the parent to ensure that there are no overlapping Volumes within itself
+        // These checks ensure that the volume hasnt been created out of bounds
+        if (!Parent.withinBoundaries(Center))
+        {
+            throw new positioningException(Center, "Attempted volume creation outside parent bounds");
+        }
     }
 
-    public Volume(Volume parent,Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits): this (parent, LowerXBound,UpperXBound,LowerYBound,UpperYBound, LowerZBound, UpperZBound, numAxisSplits)
+    protected Volume(){}
+    protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : this(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
-        long width = math.abs(upperXBound - lowerXBound) + 1;
-        long height = math.abs(upperYBound - lowerYBound) + 1;
-        long depth = math.abs(upperZBound - lowerZBound) + 1;
-        center = new Position(lowerXBound + (width / 2).ToUInt64, lowerYBound + (height / 2).ToUInt64, lowerZBound + (depth / 2).ToUInt64);
+
     }
+
 
     public virtual RVolume getRoot()
     {
@@ -176,8 +180,9 @@ public abstract class Volume : updateAble
 
     public virtual List<Volume> getAllParents()
     {
-        List<Volume> allParents = new List<Volume>(Parent);
-        allParents.AddRange(Parent.getAllParents);
+        List<Volume> allParents = new List<Volume>();
+        allParents.Add(Parent);
+        allParents.AddRange(Parent.getAllParents());
         return allParents;
     }
 
@@ -186,7 +191,7 @@ public abstract class Volume : updateAble
         // this is a very verbose and odd way of checking
         // Done this way to possiby create alternative pathways depending on which axis fails the check
 
-        if (target.x >= lowerXBound  & target.x <= upperXBound)
+        if (target.x >= lowerXBound & target.x <= upperXBound)
         {
             if (target.y >= lowerYBound & target.y <= upperYBound)
             {
@@ -206,19 +211,19 @@ public abstract class Volume : updateAble
         update();
     }
 
-    public virtual int numBodies()
-    {
-        // Very Inefficient but not likely to be called ofted
-        return getContainedBodies.Count();
-    }
+    // public virtual int numBodies()
+    // {
+    //     // Very Inefficient but not likely to be called ofted
+    //     return getContainedBodies.Count();
+    // }
 
-    protected virtual Position[,,] calculateChildVolumePositions(long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits, out bool BVolumes)
+    protected virtual long[,] calculateChildVolumePositions(long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits, out bool BVolumes)
     {
         // In Volume so dont have to rewrite in RVolume and AVolume even though BVolume will never use this
         // + 1 because boundaries are inclusive and can be shared between volumes
-        long width = math.abs(upperXBound - lowerXBound) + 1;
-        long height = math.abs(upperYBound - lowerYBound) + 1;
-        long depth = math.abs(upperZBound - lowerZBound) + 1;
+        long width = Math.Abs(upperXBound - lowerXBound) + 1;
+        long height = Math.Abs(upperYBound - lowerYBound) + 1;
+        long depth = Math.Abs(upperZBound - lowerZBound) + 1;
 
         float BVMagRatio = BVmaxMagnitude / BVminMagnitude;
 
@@ -253,7 +258,14 @@ public abstract class Volume : updateAble
         else
         {
             // from here on its ASSUMED that we want to create BVolumes
-            // AND there is the correct amount of space to create the correct amount
+            // No checks are perfomed to make sure we are creating the "correct" amount of BVolumes
+            // this just partitions up the space in a way that fits the max and min magnitude constraints
+
+            if (width % BVminMagnitude > BVmaxMagnitude - BVminMagnitude | height % BVminMagnitude > BVmaxMagnitude - BVminMagnitude | depth % BVminMagnitude > BVmaxMagnitude - BVminMagnitude)
+            {
+                throw new ArgumentException("Volume asked to create BVolumes with not enough slack");
+            }
+
             BVolumes = true;
             List<long> xBounds = new List<long>();
             List<long> yBounds = new List<long>();
@@ -261,16 +273,20 @@ public abstract class Volume : updateAble
 
             // get direction from root to current Volume to know which side to put the larger child on
             RVolume root = Parent.getRoot();
-            float[] unitVecTooRoot = root.center.unitVectorToo(this.center);
-            if (unitVecTooRoot[0] > 0) { sbyte xDir = 1; xBounds.Add(this.lowerXBound);}
-            else { sbyte xDir = -1; xBounds.Add(this.upperXBound); }
-            if (unitVecTooRoot[1] > 0) { sbyte yDir = 1; yBounds.Add(this.lowerYBound); }
-            else { sbyte yDir = -1; yBounds.Add(this.upperYBound); }
-            if (unitVecTooRoot[2] > 0) { sbyte zDir = 1; zBounds.Add(this.lowerZBound); }
-            else { sbyte zDir = -1; zBounds.Add(this.upperZBound); }
+            decimal[] unitVecTooRoot = root.Center.unitVectorToo(this.Center);
 
             // possible to do it without these seemingly redundant fields 
             // but because of the directionality having them makes the calculations easier
+            sbyte xDir;
+            sbyte yDir;
+            sbyte zDir;
+            if (unitVecTooRoot[0] > 0) { xDir = 1; xBounds.Add(this.lowerXBound); }
+            else { xDir = -1; xBounds.Add(this.upperXBound); }
+            if (unitVecTooRoot[1] > 0) { yDir = 1; yBounds.Add(this.lowerYBound); }
+            else { yDir = -1; yBounds.Add(this.upperYBound); }
+            if (unitVecTooRoot[2] > 0) { zDir = 1; zBounds.Add(this.lowerZBound); }
+            else { zDir = -1; zBounds.Add(this.upperZBound); }
+
             long remainingMag = width;
             while (true)
             {
@@ -290,105 +306,246 @@ public abstract class Volume : updateAble
                     {
                         if (xDir == 1) { xBounds.Add(this.upperXBound); }
                         else { xBounds.Add(this.lowerXBound); }
+                        break;
                     }
                 }
                 if (remainingMag < BVminMagnitude)
                 {
-                    throw new ArgumenExeption("Volume calculateChildPositions got itself into an unfixable state (x)");
+                    throw new ArgumentException("Volume calculateChildPositions got itself into an unfixable state (x)");
                 }
             }
-            
 
-
-
-
-
-
-
-
-
-            long xLeftover = width % BVminMagnitude;
-            long yLeftover = height % BVminMagnitude;
-            long zLeftover = depth % BVminMagnitude;
-
-
-            if (xLeftover > BVmaxMagnitude - BVminMagnitude | yLeftover > BVmaxMagnitude - BVminMagnitude | zLeftover > BVmaxMagnitude - BVminMagnitude)
+            remainingMag = height;
+            while (true)
             {
-                throw new ArgumentException("Volume asked to create BVolumes with not enough slack");
+                if (remainingMag > BVmaxMagnitude)
+                {
+                    yBounds.Add(yBounds.Last() + (BVminMagnitude * yDir));
+                    remainingMag = -BVminMagnitude;
+                }
+                if (remainingMag <= BVmaxMagnitude & remainingMag > BVminMagnitude)
+                {
+                    if (remainingMag - BVminMagnitude >= BVminMagnitude)
+                    {
+                        yBounds.Add(yBounds.Last() + (BVminMagnitude * yDir));
+                        remainingMag = -BVminMagnitude;
+                    }
+                    else
+                    {
+                        if (yDir == 1) { yBounds.Add(this.upperYBound); }
+                        else { yBounds.Add(this.lowerYBound); }
+                        break;
+                    }
+                }
+                if (remainingMag < BVminMagnitude)
+                {
+                    throw new ArgumentException("Volume calculateChildPositions got itself into an unfixable state (y)");
+                }
             }
 
-            
-
-            
-
+            remainingMag = depth;
+            while (true)
+            {
+                if (remainingMag > BVmaxMagnitude)
+                {
+                    zBounds.Add(zBounds.Last() + (BVminMagnitude * zDir));
+                    remainingMag = -BVminMagnitude;
+                }
+                if (remainingMag <= BVmaxMagnitude & remainingMag > BVminMagnitude)
+                {
+                    if (remainingMag - BVminMagnitude >= BVminMagnitude)
+                    {
+                        zBounds.Add(zBounds.Last() + (BVminMagnitude * zDir));
+                        remainingMag = -BVminMagnitude;
+                    }
+                    else
+                    {
+                        if (zDir == 1) { zBounds.Add(this.upperZBound); }
+                        else { zBounds.Add(this.lowerZBound); }
+                        break;
+                    }
+                }
+                if (remainingMag < BVminMagnitude)
+                {
+                    throw new ArgumentException("Volume calculateChildPositions got itself into an unfixable state (z)");
+                }
+            }
 
         }
-
-        
-
-
-
-
-
-
-
         // if doesnt fit nicely must have volumes of mismatched size
         // if (width % numAxisSplits != 0 || height % numAxisSplits != 0 || depth % numAxisSplits != 0)
         // {
 
 
         // }
-
+        return new long[3,1];
     }
-    public abstract void initialise();    
+
+    protected virtual List<Body> getMassiveBodies()
+    {
+        List<Body> allBodies = getContainedBodies();
+        List<Body> massiveBodies = new List<Body>();
+        foreach (Body body in allBodies)
+        {
+            if (body.Massive)
+            {
+                massiveBodies.Add(body);
+            }
+        }
+        return massiveBodies;
+    }
+    
+    public abstract void initialise();
+
     public abstract void injestBody(Body newBody);
 
     public abstract List<Body> getContainedBodies();
 
-    public abstract void update();
+    // public virtual void update()
+    // {
+    //     foreach (Volume child in Children)
+    //     {
+    //         child.update();
+    //     }
+    // }
 
+    public abstract void update();
     public abstract void updateMass();
 
     public abstract void updateCOM();
-
 }
 
 public class BVolume : Volume
 {
-    private Volume[] simplifiedInteractionVolumes;
-    public List<Body> Children { get; }
+    private Volume[]? simplifiedInteractionVolumes;
+    public List<Body> Children { get; private set; }
 
-
-    public BVolume(Position center, Volume parent, long xlen, long ylen, long zlen) : base(center, parent, xlen, ylen, zlen)
+    public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound,UpperXBound,LowerYBound,UpperYBound,LowerZBound,UpperZBound)
     {
         Children = new List<Body>();
-        simplifiedInteractionVolumes = new Volume[0];
     }
     // public override void initialise()
     // {
 
     // }
+    public override void initialise()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override List<Body> getContainedBodies()
+    {
+        return Children;
+    }
+
+    public override void updateCOM()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void update()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void injestBody(Body newBody)
+    {
+        if (this.withinBoundaries(newBody.Position))
+        {
+            Children.Add(newBody);
+            newBody.Parent = this;
+        }
+        else
+        {
+            Parent.injestBody(newBody);
+        }
+    }
+
+    public override void updateMass()
+    {
+        this.Mass = 0;
+        foreach (Body child in Children)
+        {
+            // This means mass counts every body even ones that arent big enough to be counted as "Massive"
+            // Has simulation implications but i think this makes more sense than sticking to "massive" requirement
+            this.Mass += child.Mass;
+        }  
+    }
 }
+
 public class RVolume : Volume
 {
-    // Root Volume is special. Its parent is itself and shouldnt ever be used
-    public List<AVolume> Children { get; }
-    public int Timestep { get; }
+    // Root Volume is special it should act as the controller for any disjoint areas of the simulation
+    public List<AVolume> Children { get; private set; }
+    public int Timestep { get; private set; }
 
     // Accessing the Parent doesnt make sense and its set to itself or null anyway
-    public Volume? Parent { get { throw new InvalidOperationException("Tried to access RVolume Parent"); } }
+    override public Volume? Parent { get { throw new InvalidOperationException("Tried to access RVolume Parent"); } }
 
     public RVolume(long xlen, long ylen, long zlen, long BVminMagnitude, long BVmaxMagnitude, byte numAxisSplits)
     {
         // length of each axis must be atleast numberVolumeSplits^2 as we need Avolume and BVolume layer below RVolume
         // Length of each axis must be at MOST half the max value of long
+
+        this.Center = new Position(0, 0, 0);
+        this.COM = Center;
+        this.lowerXBound = Convert.ToInt64(-Math.Floor(Convert.ToDouble(xlen )/ 2));
+        this.upperXBound = Convert.ToInt64(Math.Ceiling(Convert.ToDouble(xlen) / 2));
+        this.lowerYBound = Convert.ToInt64(-Math.Floor(Convert.ToDouble(ylen )/ 2));
+        this.upperYBound = Convert.ToInt64(Math.Ceiling(Convert.ToDouble(ylen) / 2));
+        this.lowerZBound = Convert.ToInt64(-Math.Floor(Convert.ToDouble(zlen) / 2));
+        this.upperZBound = Convert.ToInt64(Math.Ceiling(Convert.ToDouble(zlen) / 2));
+
+        this.Parent = null;
+        // TODO create children
     }
+
+    public override void initialise()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void updateMass()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void updateCOM()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void injestBody(Body newBody)
+    {
+        if (this.withinBoundaries(newBody.Position))
+        {
+            AVolume targetChild = Children.First();
+            double distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+
+            foreach (AVolume child in Children)
+            {
+                if (newBody.Position.distanceToo(child.Center) < distanceTooTarget)
+                {
+                    targetChild = child;
+                    distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+                }
+            }
+            targetChild.injestBody(newBody);
+        }
+        else
+        {
+            // TODO this should concat body position to be within limits and write to log
+            throw new ArgumentException("RVolume was asked to injest a body outside its limits");
+        }
+    }
+
     public override void update()
     {
-        foreach (Volume child in directChildren)
+        foreach (Volume child in Children)
         {
             child.update();
         }
+        Timestep += 1;
     }
 
     public void updateMany(int numUpdates)
@@ -404,41 +561,116 @@ public class RVolume : Volume
         return this;
     }
 
-    public override List<BVolume> getBVolumes()
-    {
-        List<BVolume> allBVolumes = new List<BVolume>();
-        foreach (AVolume item in Children)
-        {
-            allBVolumes.Add(item.getBVolumes());
-        }
-        return allBVolumes;
-    }
+    // public override List<BVolume> getBVolumes()
+    // {
+    //     List<BVolume> allBVolumes = new List<BVolume>();
+    //     foreach (AVolume item in Children)
+    //     {
+    //         allBVolumes.Add(item.getBVolumes());
+    //     }
+    //     return allBVolumes;
+    // }
 
     public override List<Volume> getAllParents()
     {
-        return new List<Volume>(this);
+        List<Volume> temp = new List<Volume>();
+        temp.Add(this);
+        return temp;
     }
-}
 
-public class AVolume : Volume {
-    private List<Volume> Children;
-
-
-    public List<BVolume> getBVolumes()
+    public override List<Body> getContainedBodies()
     {
-        return new List<BVolume>();
+        List<Body> containedBodies = new List<Body>();
+        foreach (AVolume child in Children)
+        {
+            containedBodies.AddRange(child.getContainedBodies());
+        }
+        return containedBodies;
+    }
+
+}
+
+public class AVolume : Volume
+{
+    public List<Volume> Children { get; private set; }
+
+    public AVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound, numAxisSplits)
+    {
+        // TODO create children
+    }
+    // public List<BVolume> getBVolumes()
+    // {
+    //     return new List<BVolume>();
+    // }
+
+    public override void updateCOM()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void initialise()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override void injestBody(Body newBody)
+    {
+        if (this.withinBoundaries(newBody.Position))
+        {
+            Volume targetChild = Children.First();
+            double distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+
+            foreach (Volume child in Children)
+            {
+                if (newBody.Position.distanceToo(child.Center) < distanceTooTarget)
+                {
+                    targetChild = child;
+                    distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+                }
+            }
+            targetChild.injestBody(newBody);
+        }
+        else
+        {
+            Parent.injestBody(newBody);
+        }
+    }
+
+    public override void updateMass()
+    {
+        throw new System.NotImplementedException();
+    }
+
+    public override List<Body> getContainedBodies()
+    {
+        List<Body> containedBodies = new List<Body>();
+        foreach (Volume child in Children)
+        {
+            containedBodies.AddRange(child.getContainedBodies());
+        }
+        return containedBodies;
+    }
+    public override void update()
+    {
+        foreach (Volume child in Children)
+        {
+            child.update();
+        }
     }
 }
+
 public class Body
 {
-    protected dynamicPosition pos { get; }
+    // TODO set pos should have some checks to make sure things arent breaking
+    public dynamicPosition Position { get; set; }
 
-    public ulong radius { get; }
+    public ulong Radius { get; protected set; }
 
-    public Volume parent { get; set; }
+    public Volume Parent { get; set; }
 
-    public float mass { get; }
+    public float Mass { get; protected set; }
 
-    public bool massive { get; }
+    public bool Massive { get; protected set; }
+    public bool UpdateAble { get; protected set; }
 }
 
