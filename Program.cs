@@ -234,23 +234,18 @@ public abstract class Volume : updateAble
         // this is a very verbose and odd way of checking
         // Done this way to possiby create alternative pathways depending on which axis fails the check
 
-        //Below code wont work because it always assumes lowerBound is more negative but thats not guaranteed.
-        // Need to think about if its easier to rewrite this code or guarantee its assumption in the volume constructor
-        // if (target.x >= lowerXBound & target.x <= upperXBound)
-        // {
-        //     if (target.y >= lowerYBound & target.y <= upperYBound)
-        //     {
-        //         if (target.z >= lowerZBound & target.z <= upperZBound)
-        //         {
-        //             return true;
-        //         }
-        //     }
-        // }
+        if (target.x >= lowerXBound & target.x <= upperXBound)
+        {
+            if (target.y >= lowerYBound & target.y <= upperYBound)
+            {
+                if (target.z >= lowerZBound & target.z <= upperZBound)
+                {
+                    return true;
+                }
+            }
+        }
 
-        // return false;
-
-        //TODO this is a very important method that is currently not working 
-        return true;
+        return false;
     }
 
     public virtual void updateMajor()
@@ -277,20 +272,9 @@ public abstract class Volume : updateAble
         List<long> yBounds = new List<long>();
         List<long> zBounds = new List<long>();
 
-        // get direction from root to current Volume to know which side to lower and upper bounds
-        RVolume root = Parent.getRoot();
-        decimal[] unitVecTooRoot = root.Center.unitVectorToo(this.Center);
-        sbyte xDir;
-        sbyte yDir;
-        sbyte zDir;
-
-        // Always the boundaries of the current volume will be used for one of the edge children volumes
-        if (unitVecTooRoot[0] >= 0) { xDir = 1; xBounds.Add(this.lowerXBound); }
-        else { xDir = -1; xBounds.Add(this.upperXBound); }
-        if (unitVecTooRoot[1] >= 0) { yDir = 1; yBounds.Add(this.lowerYBound); }
-        else { yDir = -1; yBounds.Add(this.upperYBound); }
-        if (unitVecTooRoot[2] >= 0) { zDir = 1; zBounds.Add(this.lowerZBound); }
-        else { zDir = -1; zBounds.Add(this.upperZBound); }
+        xBounds.Add(lowerXBound);
+        yBounds.Add(lowerYBound);
+        zBounds.Add(lowerZBound);
 
         // check that there is enough space to create children. Mostly a leftover check from before BVolumes had to all be the same size
         // if (width % (numAxisSplits * BVMagnitude) != 0 | height % (numAxisSplits * BVMagnitude) != 0 | depth % (numAxisSplits * BVMagnitude) != 0)
@@ -300,7 +284,7 @@ public abstract class Volume : updateAble
 
         // check if we are making AVolume or BVolume children
         if (width >= (numAxisSplits * BVMagnitude) * numAxisSplits & height >= (numAxisSplits * BVMagnitude) * numAxisSplits & depth >= (numAxisSplits * BVMagnitude) * numAxisSplits)
-        {   
+        {
             BVolumes = false;
 
             // All volumes are the same size but each axis can be different lengths
@@ -336,8 +320,8 @@ public abstract class Volume : updateAble
                 {
                     throw new ArgumentException("Volume calculateChildPositions got itself into an unfixable state (x)");
                 }
-                xBounds.Add(xBounds.Last() + (BVMagnitude * xDir));
-                remainingMag =- BVMagnitude;             
+                xBounds.Add(xBounds.Last() + BVMagnitude);
+                remainingMag = -BVMagnitude;
             }
 
             remainingMag = height;
@@ -348,8 +332,8 @@ public abstract class Volume : updateAble
                     throw new ArgumentException("Volume calculateChildPositions got itself into an unfixable state (y)");
                 }
 
-                yBounds.Add(yBounds.Last() + (BVMagnitude * yDir));
-                remainingMag =- BVMagnitude;
+                yBounds.Add(yBounds.Last() + BVMagnitude);
+                remainingMag = -BVMagnitude;
             }
 
             remainingMag = depth;
@@ -360,18 +344,15 @@ public abstract class Volume : updateAble
                     throw new ArgumentException("Volume calculateChildPositions got itself into an unfixable state (z)");
                 }
 
-                zBounds.Add(zBounds.Last() + (BVMagnitude * zDir));
-                remainingMag =- BVMagnitude;
+                zBounds.Add(zBounds.Last() + BVMagnitude);
+                remainingMag = -BVMagnitude;
             }
 
         }
 
-        if (xDir == 1) { xBounds.Add(this.upperXBound); }
-        else { xBounds.Add(this.lowerXBound); }
-        if (yDir == 1) { yBounds.Add(this.upperYBound); }
-        else { yBounds.Add(this.lowerYBound); }
-        if (zDir == 1) { zBounds.Add(this.upperZBound); }
-        else { zBounds.Add(this.lowerZBound); }
+        xBounds.Add(upperXBound);
+        yBounds.Add(upperYBound);
+        zBounds.Add(upperZBound);
 
         if (xBounds.Count() < 2 | yBounds.Count() < 2 | zBounds.Count() < 2)
         {
