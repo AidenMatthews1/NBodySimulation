@@ -27,3 +27,17 @@ c:/Users/asdf/Documents/NBodySimulation/obj/Debug/net9.0/ref/NBodySimulation.dll
 /home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/NBodySimulation.pdb
 /home/aiden/Documents/Coding/NBodySimulation/obj/Debug/net9.0/NBodySimulation.genruntimeconfig.cache
 /home/aiden/Documents/Coding/NBodySimulation/obj/Debug/net9.0/ref/NBodySimulation.dll
+/home/aiden/Documents/Coding/NBodySimulation/obj/Debug/net9.0/NBodySimulation.csproj.AssemblyReference.cache
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Configuration.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Configuration.Abstractions.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Configuration.Binder.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.DependencyInjection.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Logging.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Logging.Abstractions.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Logging.Configuration.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Logging.Console.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Options.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Options.ConfigurationExtensions.dll
+/home/aiden/Documents/Coding/NBodySimulation/bin/Debug/net9.0/Microsoft.Extensions.Primitives.dll
+/home/aiden/Documents/Coding/NBodySimulation/obj/Debug/net9.0/NBodySim.5177217A.Up2Date
