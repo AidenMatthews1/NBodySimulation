@@ -20,14 +20,12 @@ Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToSt
 Console.WriteLine("Hello, World!");
 //Console.WriteLine(globalVariables.units_in_m);
 
-RVolume test = new RVolume(globalVariables.M_in_Lsecond*globalVariables.Units_in_M,8, 8, 8, 2, 2);
-Console.WriteLine(test.ToString());
+//RVolume test = new RVolume(globalVariables.M_in_Lsecond*globalVariables.Units_in_M,8, 8, 8, 2, 2);
+//Console.WriteLine(test.ToString());
 
 
 
 // Basic Class Definitions ----------------------------------------------------
-
-
 
 public class positioningException : System.Exception
 {
@@ -60,6 +58,13 @@ public class Position
         this.z = zpos;
     }
 
+    public Position(Position old)
+    {
+        this.x = old.x;
+        this.y = old.y;
+        this.z = old.z;
+    }
+
     public Int64[] getPos()
     {
         return [this.x, this.y, this.z];
@@ -83,6 +88,7 @@ public class Position
         return magnitude;
     }
 
+    // TODO this doesnt need to be decimal it causes problems and solves nothing not even extra accuracy
     public decimal[] unitVectorToo(Position target)
     {
         long xDifference = this.x - target.x;
@@ -172,11 +178,6 @@ public abstract class Volume : updateAble
     public Position COM { get; protected set; }
     public float Mass { get; protected set; }
 
-    // public Volume(Volume parent,Position Center, Position LowerXBound, Position UpperXBound, Position LowerYBound, Position UpperYBound, Position LowerZBound, Position UpperZBound, byte numAxisSplits)
-    // {
-
-    // }
-
     protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound)
     {
         this.Mass = 0;
@@ -244,7 +245,6 @@ public abstract class Volume : updateAble
                 }
             }
         }
-
         return false;
     }
 
@@ -253,12 +253,6 @@ public abstract class Volume : updateAble
         updateCOM();
         update();
     }
-
-    // public virtual int numBodies()
-    // {
-    //     // Very Inefficient but not likely to be called ofted
-    //     return getContainedBodies.Count();
-    // }
 
     protected virtual List<long>[] calculateChildVolumePositions(long BVMagnitude, byte numAxisSplits, out bool BVolumes)
     {
@@ -384,15 +378,10 @@ public abstract class Volume : updateAble
 
     public abstract List<Body> getContainedBodies();
 
-    // public virtual void update()
-    // {
-    //     foreach (Volume child in Children)
-    //     {
-    //         child.update();
-    //     }
-    // }
+    public abstract int numBodies();
 
     public abstract void update();
+
     public abstract void updateMass();
 
     public abstract void updateCOM();
@@ -401,7 +390,10 @@ public abstract class Volume : updateAble
 public class BVolume : Volume
 {
     private Volume[]? simplifiedInteractionVolumes;
-    public List<Body> Children { get; private set; }
+    // This is sketchy not sure if I want to set it up like this long term
+    public List<Body>? Children { get { return new List<Body>().AddRange(NMChildren).AddRange(MChildren); } private set; }
+    public List<Body> NMChildren { get; private set; }
+    public List<Body> MChildren { get; private set; }
 
     public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
@@ -424,13 +416,27 @@ public class BVolume : Volume
 
     public override void updateCOM()
     {
-        throw new System.NotImplementedException();
+        // Done with temp values to limit possible race conditions in multithread scenario.
+        // If reseting mass and COM while doing calculations any other threads will be getting incorrect data
+        // Better to give them out of date values instead
+        Position newCOM = new Position(Center);
+        float newMass = 0;
+
+        foreach (Body child in MChildren)
+        {
+            float Ratio = (newMass + child.Mass) / child.Mass;
+            decimal[] Direction = child.Position.unitVectorToo(newCOM);
+            newCOM.setPos(newCOM.x + (Direction[0] * Ratio), newCOM.y + (Direction[1] * Ratio), newCOM.z + (Direction[2] * Ratio));
+        }
+        this.COM = newCOM;
+        this.Mass = newMass;
     }
 
     public override void update()
     {
         throw new System.NotImplementedException();
     }
+
 
     public override void injestBody(Body newBody)
     {
@@ -447,13 +453,13 @@ public class BVolume : Volume
 
     public override void updateMass()
     {
-        this.Mass = 0;
-        foreach (Body child in Children)
+        // Done with temp values to limit possible race condition in multithread scenario
+        float tempMass = 0;
+        foreach (Body child in MChildren)
         {
-            // This means mass counts every body even ones that arent big enough to be counted as "Massive"
-            // Has simulation implications but i think this makes more sense than sticking to "massive" requirement
-            this.Mass += child.Mass;
+            this.tempMass += child.Mass;
         }
+        this.Mass = tempMass;
     }
 }
 
@@ -721,7 +727,6 @@ public class AVolume : Volume
 
 public class Body
 {
-    // TODO set pos should have some checks to make sure things arent breaking
     public dynamicPosition Position { get; set; }
 
     public ulong Radius { get; protected set; }
@@ -731,5 +736,6 @@ public class Body
     public float Mass { get; protected set; }
 
     public bool Massive { get; protected set; }
-    public bool UpdateAble { get; protected set; }
+
+    //public void applyForce()
 }
