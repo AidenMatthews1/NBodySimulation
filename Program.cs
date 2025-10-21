@@ -2,6 +2,7 @@
 
 using Globals;
 using Microsoft.Extensions.Logging;
+using System;
 
 // Microsoft.Extensions.Logging.ILoggerFactory loggerFactory = new Microsoft.Extensions.Logging.LoggerFactory(
 //     new[] {new Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider((_,__) => true, true)}
@@ -78,7 +79,7 @@ public class Vector
         UInt64 ydiff = Convert.ToUInt64(this.y - targetcoords[1]);
         UInt64 zdiff = Convert.ToUInt64(this.z - targetcoords[2]);
 
-        double magnitude = Math.Sqrt(xdiff ^ 2 + ydiff ^ 2 + zdiff ^ 2);
+        double magnitude = Math.Sqrt(Math.Pow(xdiff, 2) + Math.Pow(ydiff, 2) + Math.Pow(zdiff, 2));
         return magnitude;
     }
 
@@ -93,7 +94,7 @@ public class Vector
         long xDifference = this.x - targetx;
         long yDifference = this.y - targety;
         long zDifference = this.z - targetz;
-        double magnitude = Math.Sqrt(xDifference ^ 2 + yDifference ^ 2 + zDifference ^ 2);
+        double magnitude = Math.Sqrt(Math.Pow(xDifference, 2) + Math.Pow(yDifference, 2) + Math.Pow(zDifference, 2));
         //decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
         double[] temp = { Convert.ToDouble(xDifference) / magnitude, Convert.ToDouble(yDifference) / magnitude, Convert.ToDouble(zDifference) / magnitude };
         return temp;
@@ -112,10 +113,14 @@ public class Vector
         return new Vector(xDifference, yDifference, zDifference);
     }
 
+    public double magnitude()
+    {
+        return checked(Math.Sqrt(Math.Pow(x,2) + Math.Pow(y,2) + Math.Pow(z,2)));
+    }
 
     public override string ToString()
     {
-        return $"Position at: {x}, {y}, {x}";
+        return $"{x}, {y}, {z}";
     }
 }
 
@@ -172,9 +177,9 @@ public class dynamicPosition : Vector, updateAble
     //     return [this.xvel, this.yvel, this.zvel];
     // }
 
-    protected double calcMagnitude()
+    protected double velMagnitude()
     {
-        return Math.Sqrt(xvel ^ 2 + yvel ^ 2 + zvel ^ 2);
+        return Math.Sqrt(Math.Pow(xvel,2) + Math.Pow(yvel,2) + Math.Pow(zvel,2));
     }
 
     public override global::System.String ToString()
@@ -198,6 +203,8 @@ public abstract class Volume : updateAble
     public long upperZBound { get; protected set; }
     public Vector COM { get; protected set; }
     public float Mass { get; protected set; }
+
+    public Guid id {get; protected set;}
 
     protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound)
     {
@@ -225,6 +232,8 @@ public abstract class Volume : updateAble
             globalVariables.log.LogError($"Volume is being created with center outside parent bounds\nChild Volume {Center.ToString()}. Parent Volume: {Parent.Center.ToString()}");
             throw new positioningException(Center, "Attempted volume creation outside parent bounds");
         }
+
+        this.id = Guid.NewGuid();
     }
 
     protected Volume() { } // Here because of a Quirk of C# Constructor Inheritance, does nothing except stop a random error
@@ -236,7 +245,7 @@ public abstract class Volume : updateAble
 
     public override string ToString()
     {
-        return $"{this.GetType()} with parent {Parent.GetType()}. Centered at {this.Center.ToString()}, total Mass {Mass}.";
+        return $"{this.GetType()} {this.id.ToString()} Centered at {this.Center.ToString()}, total Mass {Mass} with parent {Parent.GetType()}.";
     }
 
     public virtual RVolume getRoot()
@@ -412,6 +421,7 @@ public abstract class Volume : updateAble
 public class BVolume : Volume
 {
     private Volume[]? simplifiedInteractionVolumes;
+    private BVolume[]? fullInteractionVolumes;
     // This is sketchy not sure if I want to set it up like this long term
     //public List<Body>? Children { get { return new List<Body>().AddRange(NMChildren).AddRange(MChildren); } private set; }
     public List<Body> NMChildren { get; private set; }
@@ -419,45 +429,126 @@ public class BVolume : Volume
 
     public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
-        globalVariables.log.LogTrace($"BVolume constructor called with boundaries  {LowerXBound},  {UpperXBound},  {LowerYBound},  {UpperYBound},  {LowerZBound},  {UpperZBound}");
+        //globalVariables.log.LogTrace($"BVolume constructor called with boundaries  {LowerXBound},  {UpperXBound},  {LowerYBound},  {UpperYBound},  {LowerZBound},  {UpperZBound}");
         MChildren = new List<Body>();
         NMChildren = new List<Body>();
-
+        globalVariables.log.LogTrace($"BVolume constructed: {this.ToString()}");
     }
-    // public override void initialise()
-    // {
 
-    // }
     public override void initialise()
     {
         List<Volume> candidates = new List<Volume>();
-        candidates.Add(getRoot());
+        candidates.AddRange(getRoot().Children);
         List<Volume> simplifiedInteractions = new List<Volume>();
+        List<BVolume> fullInteractions = new List<BVolume>();
 
-        decimal calcAngle(Vector a, Vector b)
+        double calcAngle(Vector a, Vector b)
         {
             // theta = cos^(-1)(a.b/(|a||b|))
             // product of the magnitudes is likely to result in an overflow 
-            // If I straight calculate the dot product it could result in an overflow even using longs
-            // Dot product can be as large as the product of the magnitudes of the vectors which is going to be huge
-            return 0;
+            // Dot product can be as large as the product of the magnitudes of the vectors as well so it could also result in an overflow even using longs
 
+            // To make it slightly less likely to overflow I will separate the dot product calculation into individual axis, and separate the divisions 
+            // Each axis of the dot product will be divided by |a| and then the sum will be divided by |b|
+            // This way the entire dot product and the product of the magnitde doesnt need to be calculated. Still dealing with very large numbers but not as large as product of magnitudes  
+            // Thought about individually dividing the Axis BEFORE multiplication but that will result in very small deximals instead which is a whole other can of worms
+
+            double angle;
+            try
+            {
+                double temp = checked(((Convert.ToDouble(a.x) * b.x) / a.magnitude() + (Convert.ToDouble(a.y) * b.y) / a.magnitude() + (Convert.ToDouble(a.z) * b.z) / a.magnitude()) / b.magnitude());
+                
+                angle = Math.Acos(temp);
+                if (temp > 1)
+                {
+                    angle = 0;
+                }
+                if (temp < -1)
+                {
+                    angle = Math.PI;
+                }
+                //Console.WriteLine(angle * 180 / Math.PI);
+                //angle = (decimal)Math.Acos(checked(((Convert.ToDouble(a.x) /a.magnitude()) * b.x/ a.magnitude() + (Convert.ToDouble(a.y)/a.magnitude()) * b.y/ a.magnitude() + (Convert.ToDouble(a.z)/a.magnitude()) * b.z/ a.magnitude()) / b.magnitude()));
+            }
+            catch (Exception e)
+            {
+                globalVariables.log.LogCritical($"Likely Arithmetic Overflow while initialising. Attempted to calculate angle between two vectors:\n{a.ToString()}\n{b.ToString()}\nmax integer value: {Int64.MaxValue}");
+                globalVariables.log.LogTrace(((Convert.ToDouble(a.x) * b.x) / a.magnitude()).ToString());
+                globalVariables.log.LogTrace(((Convert.ToDouble(a.y) * b.y) / a.magnitude()).ToString());
+                globalVariables.log.LogTrace(((Convert.ToDouble(a.z) * b.z) / a.magnitude()).ToString());
+                globalVariables.log.LogTrace(b.magnitude().ToString());
+                globalVariables.log.LogCritical(e.Message);
+                throw new OverflowException();
+            }
+            return angle;
         }
 
         while (candidates.Count() > 0)
         {
-            if (simplifiedInteractions.Contains(candidates[0]))
+            Volume currentTarget = candidates[0];
+            if (simplifiedInteractions.Contains(currentTarget) | fullInteractions.Contains(currentTarget))
             {
+                Console.WriteLine("Removed target already checked");
+                Console.WriteLine(currentTarget.ToString());
+                candidates.RemoveAt(0);
+                Console.WriteLine(candidates[0].ToString());
+                continue;
+            }
+
+            // If one of the parents is already simplified then we dont have to check this candidate
+            // This should not be possible but it seems to be happening somewhere
+            List<Volume> targetParents = currentTarget.getAllParents();
+            foreach (Volume parent in targetParents)
+            {
+                if (simplifiedInteractions.Contains(parent))
+                {
+                    Console.WriteLine("Removed target with simplified parent");
+                    candidates.RemoveAt(0);
+                    continue;
+                }
+            }
+
+            if (currentTarget is RVolume) // legacy but might still be a useful check
+            {
+                RVolume tempcurrentTarget = currentTarget as RVolume;
+                candidates.AddRange(tempcurrentTarget.Children);
                 candidates.RemoveAt(0);
                 continue;
             }
 
-            decimal largestAngle = 0;
 
+            Vector lowerTarget = new Vector(Center.x - currentTarget.lowerXBound, Center.y - currentTarget.lowerYBound, Center.z - currentTarget.lowerZBound);
+            Vector upperTarget = new Vector(Center.x - currentTarget.upperXBound, Center.y - currentTarget.upperYBound, Center.z - currentTarget.upperZBound);
+            double angle = calcAngle(lowerTarget, upperTarget);
 
-             
+            // If its far enough away that we can simplify the interactions
+            if (angle <= globalVariables.max_angle_initialisation)
+            {
+                simplifiedInteractions.Add(currentTarget);
+                //globalVariables.log.LogTrace($"{this.ToString()} has found simplified interaction {currentTarget.ToString()}");
+            }
+            else  // Cant simplify the interactions with this volume 
+            {
+                if (currentTarget is BVolume)
+                {
+                    fullInteractions.Add(currentTarget as BVolume);
+                }
+                else
+                {
+                    if (currentTarget is AVolume)
+                    {
+                        AVolume tempcurrentTarget = currentTarget as AVolume;
+                        candidates.AddRange(tempcurrentTarget.Children);
+                    }
+                }
+                // this if chain will ensure that if somehow an objects not BVolume AVolume or RVolume then it simply gets removed from the list
+            }
+            candidates.RemoveAt(0);
         }
 
+        this.simplifiedInteractionVolumes = simplifiedInteractions.ToArray();
+        this.fullInteractionVolumes = fullInteractions.ToArray();
+        globalVariables.log.LogTrace($"{this.ToString()} has finished finding simplified interactions {simplifiedInteractions.Count()}, {fullInteractions.Count()}");
     }
 
     public override List<Body> getContainedBodies()
@@ -489,9 +580,17 @@ public class BVolume : Volume
             zPosOffset += Direction[2] * (double)Ratio;
             newMass += child.Mass;
         }
+        Vector newCOM = new Vector(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+        if (this.withinBoundaries(newCOM))
+        {
+            this.COM = newCOM;
+            this.Mass = newMass;
+        }
+        else
+        {
+            globalVariables.log.LogError($"Updating COM resulted in COM outside of boundaries. newCOM has been ignored, falling back to old value. \n{this.ToString()} \n{newCOM.ToString()}");
+        }
         
-        this.COM = new Vector(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
-        this.Mass = newMass;
     }
 
     public override void update()
@@ -538,8 +637,6 @@ public class RVolume : Volume
     public List<AVolume> Children { get; private set; }
     public int Timestep { get; private set; }
 
-    // Accessing the Parent doesnt make sense and its set to itself or null anyway
-    // TODO add log entry on get
     override public Volume Parent { get { globalVariables.log.LogWarning("Attempted to get RVolume Parent"); return this; } }
 
     public RVolume(long BVMagnitude,long xlen, long ylen, long zlen, byte numAxisSplits, byte RVolumeSplits)
@@ -579,16 +676,21 @@ public class RVolume : Volume
         List<long> xBoundary = boundaries[0];
         List<long> yBoundary = boundaries[1];
         List<long> zBoundary = boundaries[2];
-        
-        for (int x = 0; x < xBoundary.Count()-1; x++)
+
+        for (int x = 0; x < xBoundary.Count() - 1; x++)
         {
-            for (int y = 0; y < yBoundary.Count()-1; y++)
+            for (int y = 0; y < yBoundary.Count() - 1; y++)
             {
-                for (int z = 0; z < zBoundary.Count()-1; z++)
+                for (int z = 0; z < zBoundary.Count() - 1; z++)
                 {
                     Children.Add(new AVolume(this, BVMagnitude, xBoundary[x], xBoundary[x + 1], yBoundary[y], yBoundary[y + 1], zBoundary[z], zBoundary[z + 1], numAxisSplits));
                 }
             }
+        }
+        
+        foreach(AVolume child in Children)
+        {
+            child.initialise();
         }
     }
 
