@@ -199,7 +199,7 @@ public abstract class Volume : updateAble
         long width = Math.Abs(upperXBound - lowerXBound) + 1;
         long height = Math.Abs(upperYBound - lowerYBound) + 1;
         long depth = Math.Abs(upperZBound - lowerZBound) + 1;
-        // TODO this is wrong it should take into account directionality to Root to check which bound to use
+
         this.Center = new Position(lowerXBound + (width / 2), lowerYBound + (height / 2), lowerZBound + (depth / 2));
         this.COM = Center;
 
@@ -208,15 +208,16 @@ public abstract class Volume : updateAble
         if (!Parent.withinBoundaries(Center))
         {
             globalVariables.log.LogError($"Volume is being created with center outside parent bounds\nChild Volume {Center.ToString()}. Parent Volume: {Parent.Center.ToString()}");
-            //throw new positioningException(Center, "Attempted volume creation outside parent bounds");
+            throw new positioningException(Center, "Attempted volume creation outside parent bounds");
         }
     }
 
-    protected Volume() { }
-    protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : this(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
-    {
-        // TODO create constructor where number of RVolume children is different than default axis splits
-    }
+    protected Volume() { } // Here because of a Quirk of C# Constructor Inheritance, does nothing except stop a random error
+
+    // protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : this(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
+    // {
+    //     // TODO create constructor where number of RVolume children is different than default axis splits
+    // }
 
     public override string ToString()
     {
@@ -388,7 +389,7 @@ public abstract class Volume : updateAble
 
     public abstract void update();
 
-    public abstract void updateMass();
+    //public abstract void updateMass();
 
     public abstract void updateCOM();
 }
@@ -477,16 +478,16 @@ public class BVolume : Volume
         }
     }
 
-    public override void updateMass()
-    {
-        // Done with temp values to limit possible race condition in multithread scenario
-        float tempMass = 0;
-        foreach (Body child in MChildren)
-        {
-            tempMass += child.Mass;
-        }
-        this.Mass = tempMass;
-    }
+    // public override void updateMass()
+    // {
+    //     // Done with temp values to limit possible race condition in multithread scenario
+    //     float tempMass = 0;
+    //     foreach (Body child in MChildren)
+    //     {
+    //         tempMass += child.Mass;
+    //     }
+    //     this.Mass = tempMass;
+    // }
 }
 
 public class RVolume : Volume
@@ -566,10 +567,10 @@ public class RVolume : Volume
         throw new System.NotImplementedException();
     }
 
-    public override void updateMass()
-    {
-        throw new System.NotImplementedException();
-    }
+    // public override void updateMass()
+    // {
+    //     throw new System.NotImplementedException();
+    // }
 
     public override void updateCOM()
     {
@@ -655,7 +656,7 @@ public class AVolume : Volume
 {
     public List<Volume> Children { get; private set; }
 
-    public AVolume(Volume cParent, long BVMagnitude, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound, numAxisSplits)
+    public AVolume(Volume cParent, long BVMagnitude, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
         // Base constructor handles Base Fields this constructor is mostly for creating children
 
@@ -697,7 +698,26 @@ public class AVolume : Volume
 
     public override void updateCOM()
     {
-        throw new System.NotImplementedException();
+        // See BVolume updateCom for rational and explanation
+        float newMass = 0;
+        double xPosOffset = 0;
+        double yPosOffset = 0;
+        double zPosOffset = 0;
+
+        foreach (Volume child in Children)
+        {
+            child.updateCOM();
+            float Ratio = (newMass + child.Mass) / child.Mass;
+            // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
+            double[] Direction = child.COM.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+            xPosOffset += Direction[0] * (double)Ratio;
+            yPosOffset += Direction[1] * (double)Ratio;
+            zPosOffset += Direction[2] * (double)Ratio;
+            newMass += child.Mass;
+        }
+        
+        this.COM = new Position(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+        this.Mass = newMass;
     }
 
     public override void initialise()
@@ -728,10 +748,10 @@ public class AVolume : Volume
         }
     }
 
-    public override void updateMass()
-    {
-        throw new System.NotImplementedException();
-    }
+    // public override void updateMass()
+    // {
+    //     throw new System.NotImplementedException();
+    // }
 
     public override List<Body> getContainedBodies()
     {
