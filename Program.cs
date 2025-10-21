@@ -20,8 +20,8 @@ Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToSt
 Console.WriteLine("Hello, World!");
 //Console.WriteLine(globalVariables.units_in_m);
 
-//RVolume test = new RVolume(globalVariables.M_in_Lsecond*globalVariables.Units_in_M,8, 8, 8, 2, 2);
-//Console.WriteLine(test.ToString());
+RVolume test = new RVolume(globalVariables.M_in_Lsecond*globalVariables.Units_in_M,8, 8, 8, 2, 2);
+Console.WriteLine(test.ToString());
 
 
 
@@ -88,14 +88,20 @@ public class Position
         return magnitude;
     }
 
-    // TODO this doesnt need to be decimal it causes problems and solves nothing not even extra accuracy
-    public decimal[] unitVectorToo(Position target)
+    public double[] unitVectorToo(Position target)
     {
-        long xDifference = this.x - target.x;
-        long yDifference = this.y - target.y;
-        long zDifference = this.z - target.z;
-        double magnitude = Convert.ToDouble(Math.Sqrt(x ^ 2 + y ^ 2 + z ^ 2));
-        decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
+       return unitVectorToo(target.x, target.y, target.z);
+    }
+    
+    // TODO Need to think deeply about floating point error here and if I can do anything about it
+    public double[] unitVectorToo(long targetx, long targety, long targetz)
+    {
+        long xDifference = this.x - targetx;
+        long yDifference = this.y - targety;
+        long zDifference = this.z - targetz;
+        double magnitude = Math.Sqrt(xDifference ^ 2 + yDifference ^ 2 + zDifference ^ 2);
+        //decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
+        double[] temp = { Convert.ToDouble(xDifference) / magnitude, Convert.ToDouble(yDifference) / magnitude, Convert.ToDouble(zDifference) / magnitude };
         return temp;
     }
 
@@ -378,7 +384,7 @@ public abstract class Volume : updateAble
 
     public abstract List<Body> getContainedBodies();
 
-    public abstract int numBodies();
+    //public abstract int numBodies();
 
     public abstract void update();
 
@@ -391,14 +397,16 @@ public class BVolume : Volume
 {
     private Volume[]? simplifiedInteractionVolumes;
     // This is sketchy not sure if I want to set it up like this long term
-    public List<Body>? Children { get { return new List<Body>().AddRange(NMChildren).AddRange(MChildren); } private set; }
+    //public List<Body>? Children { get { return new List<Body>().AddRange(NMChildren).AddRange(MChildren); } private set; }
     public List<Body> NMChildren { get; private set; }
     public List<Body> MChildren { get; private set; }
 
     public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
         globalVariables.log.LogTrace($"BVolume constructor called with boundaries  {LowerXBound},  {UpperXBound},  {LowerYBound},  {UpperYBound},  {LowerZBound},  {UpperZBound}");
-        Children = new List<Body>();
+        MChildren = new List<Body>();
+        NMChildren = new List<Body>();
+
     }
     // public override void initialise()
     // {
@@ -411,6 +419,9 @@ public class BVolume : Volume
 
     public override List<Body> getContainedBodies()
     {
+        List<Body> Children = new List<Body>();
+        Children.AddRange(NMChildren);
+        Children.AddRange(MChildren);
         return Children;
     }
 
@@ -419,16 +430,24 @@ public class BVolume : Volume
         // Done with temp values to limit possible race conditions in multithread scenario.
         // If reseting mass and COM while doing calculations any other threads will be getting incorrect data
         // Better to give them out of date values instead
-        Position newCOM = new Position(Center);
+        //Position newCOM = new Position(Center);
         float newMass = 0;
+        double xPosOffset = 0;
+        double yPosOffset = 0;
+        double zPosOffset = 0;
 
         foreach (Body child in MChildren)
         {
             float Ratio = (newMass + child.Mass) / child.Mass;
-            decimal[] Direction = child.Position.unitVectorToo(newCOM);
-            newCOM.setPos(newCOM.x + (Direction[0] * Ratio), newCOM.y + (Direction[1] * Ratio), newCOM.z + (Direction[2] * Ratio));
+            // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
+            double[] Direction = child.Position.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+            xPosOffset += Direction[0] * (double)Ratio;
+            yPosOffset += Direction[1] * (double)Ratio;
+            zPosOffset += Direction[2] * (double)Ratio;
+            newMass += child.Mass;
         }
-        this.COM = newCOM;
+        
+        this.COM = new Position(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
         this.Mass = newMass;
     }
 
@@ -442,7 +461,14 @@ public class BVolume : Volume
     {
         if (this.withinBoundaries(newBody.Position))
         {
-            Children.Add(newBody);
+            if (newBody.Massive)
+            {
+                MChildren.Add(newBody);
+            }
+            else
+            {
+                NMChildren.Add(newBody);
+            }
             newBody.Parent = this;
         }
         else
@@ -457,7 +483,7 @@ public class BVolume : Volume
         float tempMass = 0;
         foreach (Body child in MChildren)
         {
-            this.tempMass += child.Mass;
+            tempMass += child.Mass;
         }
         this.Mass = tempMass;
     }
@@ -471,7 +497,7 @@ public class RVolume : Volume
 
     // Accessing the Parent doesnt make sense and its set to itself or null anyway
     // TODO add log entry on get
-    override public Volume? Parent { get { globalVariables.log.LogWarning("Attempted to get RVolume Parent"); return this; } }
+    override public Volume Parent { get { globalVariables.log.LogWarning("Attempted to get RVolume Parent"); return this; } }
 
     public RVolume(long BVMagnitude,long xlen, long ylen, long zlen, byte numAxisSplits, byte RVolumeSplits)
     {
