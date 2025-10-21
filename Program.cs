@@ -502,8 +502,6 @@ public class RVolume : Volume
 
     public RVolume(long BVMagnitude,long xlen, long ylen, long zlen, byte numAxisSplits, byte RVolumeSplits)
     {
-        // length of each axis must be atleast numberVolumeSplits^2 as we need Avolume and BVolume layer below RVolume
-        // Length of each axis must be at MOST half the max value of long
         Children = new List<AVolume>();
 
         bool BVolumes = false;
@@ -523,14 +521,14 @@ public class RVolume : Volume
         this.upperYBound = Convert.ToInt64(BVMagnitude*Math.Ceiling(Convert.ToDouble(ylen) / 2));
         this.lowerZBound = Convert.ToInt64(BVMagnitude*-Math.Floor(Convert.ToDouble(zlen) / 2));
         this.upperZBound = Convert.ToInt64(BVMagnitude*Math.Ceiling(Convert.ToDouble(zlen) / 2));
-        this.Parent = null;
+        this.Parent = this;
 
         globalVariables.log.LogTrace($"RVolume begining child creation with bounds {lowerXBound}, {upperXBound}, {lowerYBound}, {upperYBound}, {lowerZBound}, {upperZBound}");
 
 
         List<long>[] boundaries = calculateChildVolumePositions(BVMagnitude, RVolumeSplits, out BVolumes);
 
-        //RVolume assumes its direct children are AVolumes for some reasons not implemented yet
+        //RVolume assumes its direct children are AVolumes, 
         if (BVolumes)
         {
             throw new ArgumentException("RVolume was created without enough space in atleast 1 axis");
@@ -564,7 +562,10 @@ public class RVolume : Volume
 
     public override void initialise()
     {
-        throw new System.NotImplementedException();
+        foreach(AVolume child in Children)
+        {
+            child.initialise();
+        }
     }
 
     // public override void updateMass()
@@ -722,7 +723,9 @@ public class AVolume : Volume
 
     public override void initialise()
     {
-        throw new System.NotImplementedException();
+        foreach (Volume child in Children){
+            child.initialise();
+        }
     }
 
     public override void injestBody(Body newBody)
@@ -748,11 +751,6 @@ public class AVolume : Volume
         }
     }
 
-    // public override void updateMass()
-    // {
-    //     throw new System.NotImplementedException();
-    // }
-
     public override List<Body> getContainedBodies()
     {
         List<Body> containedBodies = new List<Body>();
@@ -762,6 +760,7 @@ public class AVolume : Volume
         }
         return containedBodies;
     }
+
     public override void update()
     {
         foreach (Volume child in Children)
