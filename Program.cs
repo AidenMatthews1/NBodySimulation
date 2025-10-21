@@ -30,12 +30,12 @@ Console.WriteLine(test.ToString());
 public class positioningException : System.Exception
 {
     public string Message { get; } = "Position in spot that should not be possible";
-    public Position Offender { get; }
-    public positioningException(Position cOffender)
+    public Vector Offender { get; }
+    public positioningException(Vector cOffender)
     {
         Offender = cOffender;
     }
-    public positioningException(Position cOffender, string cMessage) : this(cOffender)
+    public positioningException(Vector cOffender, string cMessage) : this(cOffender)
     {
         Message = cMessage;
     }
@@ -45,20 +45,20 @@ public class positioningException : System.Exception
         System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
 }
 
-public class Position
+public class Vector
 {
     public Int64 x { get; protected set; }
     public Int64 y { get; protected set; }
     public Int64 z { get; protected set; }
 
-    public Position(Int64 xpos, Int64 ypos, Int64 zpos)
+    public Vector(Int64 xpos, Int64 ypos, Int64 zpos)
     {
         this.x = xpos;
         this.y = ypos;
         this.z = zpos;
     }
 
-    public Position(Position old)
+    public Vector(Vector old)
     {
         this.x = old.x;
         this.y = old.y;
@@ -70,14 +70,8 @@ public class Position
         return [this.x, this.y, this.z];
     }
 
-    public void setPos(Int64 xpos, Int64 ypos, Int64 zpos)
-    {
-        this.x = xpos;
-        this.y = ypos;
-        this.z = zpos;
-    }
 
-    public double distanceToo(Position target)
+    public double distanceToo(Vector target)
     {
         Int64[] targetcoords = target.getPos();
         UInt64 xdiff = Convert.ToUInt64(this.x - targetcoords[0]);
@@ -88,11 +82,11 @@ public class Position
         return magnitude;
     }
 
-    public double[] unitVectorToo(Position target)
+    public double[] unitVectorToo(Vector target)
     {
        return unitVectorToo(target.x, target.y, target.z);
     }
-    
+
     // TODO Need to think deeply about floating point error here and if I can do anything about it
     public double[] unitVectorToo(long targetx, long targety, long targetz)
     {
@@ -105,13 +99,27 @@ public class Position
         return temp;
     }
 
+    public Vector vectorToo(Vector target)
+    {
+        return vectorToo(target.x, target.y, target.z);
+    }
+
+    public Vector vectorToo(long targetx, long targety, long targetz)
+    {
+        long xDifference = this.x - targetx;
+        long yDifference = this.y - targety;
+        long zDifference = this.z - targetz;
+        return new Vector(xDifference, yDifference, zDifference);
+    }
+
+
     public override string ToString()
     {
         return $"Position at: {x}, {y}, {x}";
     }
 }
 
-public class dynamicPosition : Position, updateAble
+public class dynamicPosition : Vector, updateAble
 {
     public Int64 xvel { get; protected set; }
     public Int64 yvel { get; protected set; }
@@ -152,6 +160,13 @@ public class dynamicPosition : Position, updateAble
         this.zvel += zveloc;
     }
 
+    public void setPos(Int64 xpos, Int64 ypos, Int64 zpos)
+    {
+        this.x = xpos;
+        this.y = ypos;
+        this.z = zpos;
+    }
+
     // public Int64[] getVel()
     // {
     //     return [this.xvel, this.yvel, this.zvel];
@@ -171,7 +186,7 @@ public class dynamicPosition : Position, updateAble
 public abstract class Volume : updateAble
 {
     public virtual Volume Parent { get; protected set; }
-    public Position Center { get; protected set; }
+    public Vector Center { get; protected set; }
 
     // For the boudaries LowerBound is CLOSEST to RVolume center not most negative
     // In all cases RVolume center can be assumed to be 0 
@@ -181,7 +196,7 @@ public abstract class Volume : updateAble
     public long upperYBound { get; protected set; }
     public long lowerZBound { get; protected set; }
     public long upperZBound { get; protected set; }
-    public Position COM { get; protected set; }
+    public Vector COM { get; protected set; }
     public float Mass { get; protected set; }
 
     protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound)
@@ -200,7 +215,7 @@ public abstract class Volume : updateAble
         long height = Math.Abs(upperYBound - lowerYBound) + 1;
         long depth = Math.Abs(upperZBound - lowerZBound) + 1;
 
-        this.Center = new Position(lowerXBound + (width / 2), lowerYBound + (height / 2), lowerZBound + (depth / 2));
+        this.Center = new Vector(lowerXBound + (width / 2), lowerYBound + (height / 2), lowerZBound + (depth / 2));
         this.COM = Center;
 
         // It is left to the parent to ensure that there are no overlapping Volumes within itself
@@ -237,7 +252,7 @@ public abstract class Volume : updateAble
         return allParents;
     }
 
-    public virtual bool withinBoundaries(Position target)
+    public virtual bool withinBoundaries(Vector target)
     {
         // this is a very verbose and odd way of checking
         // Done this way to possiby create alternative pathways depending on which axis fails the check
@@ -415,7 +430,34 @@ public class BVolume : Volume
     // }
     public override void initialise()
     {
-        throw new System.NotImplementedException();
+        List<Volume> candidates = new List<Volume>();
+        candidates.Add(getRoot());
+        List<Volume> simplifiedInteractions = new List<Volume>();
+
+        decimal calcAngle(Vector a, Vector b)
+        {
+            // theta = cos^(-1)(a.b/(|a||b|))
+            // product of the magnitudes is likely to result in an overflow 
+            // If I straight calculate the dot product it could result in an overflow even using longs
+            // Dot product can be as large as the product of the magnitudes of the vectors which is going to be huge
+            return 0;
+
+        }
+
+        while (candidates.Count() > 0)
+        {
+            if (simplifiedInteractions.Contains(candidates[0]))
+            {
+                candidates.RemoveAt(0);
+                continue;
+            }
+
+            decimal largestAngle = 0;
+
+
+             
+        }
+
     }
 
     public override List<Body> getContainedBodies()
@@ -431,7 +473,7 @@ public class BVolume : Volume
         // Done with temp values to limit possible race conditions in multithread scenario.
         // If reseting mass and COM while doing calculations any other threads will be getting incorrect data
         // Better to give them out of date values instead
-        //Position newCOM = new Position(Center);
+        //Vector newCOM = new Vector(Center);
         float newMass = 0;
         double xPosOffset = 0;
         double yPosOffset = 0;
@@ -448,7 +490,7 @@ public class BVolume : Volume
             newMass += child.Mass;
         }
         
-        this.COM = new Position(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+        this.COM = new Vector(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
         this.Mass = newMass;
     }
 
@@ -505,7 +547,7 @@ public class RVolume : Volume
         Children = new List<AVolume>();
 
         bool BVolumes = false;
-        this.Center = new Position(0, 0, 0);
+        this.Center = new Vector(0, 0, 0);
         this.COM = Center;
         this.Timestep = 0;
         // length of each axis must be atleast numberVolumeSplits^2 as we need Avolume and BVolume layer below RVolume
@@ -717,7 +759,7 @@ public class AVolume : Volume
             newMass += child.Mass;
         }
         
-        this.COM = new Position(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+        this.COM = new Vector(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
         this.Mass = newMass;
     }
 
