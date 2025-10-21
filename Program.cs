@@ -188,7 +188,7 @@ public class dynamicPosition : Vector, updateAble
     }
 }
 
-public abstract class Volume : updateAble
+public abstract class Volume : updateAble, mass
 {
     public virtual Volume Parent { get; protected set; }
     public Vector Center { get; protected set; }
@@ -914,17 +914,30 @@ public class AVolume : Volume
     }
 }
 
-public class Body
+public class Body : mass
 {
-    public dynamicPosition Position { get; set; }
+    // Center of Mass used even though not all bodies will be "massive" to comply with mass interface standards
+    public dynamicPosition COM { get; set; }
 
     public ulong Radius { get; protected set; }
 
     public Volume Parent { get; set; }
 
-    public float Mass { get; protected set; }
+    public double Mass { get; protected set; }
 
     public bool Massive { get; protected set; }
 
-    //public void applyForce()
+    public void applyForce(mass[] )
+}
+
+interface updateAble
+{
+    public void update();
+    public void updateMajor();
+}
+
+interface mass
+{
+    public double Mass { get; }
+    public Vector COM { get; }
 }
