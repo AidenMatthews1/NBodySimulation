@@ -6,9 +6,9 @@ namespace Globals
     {
         public static int Units_in_M = 1000;
         public static int seconds_per_timestep = 60;
-        public static double max_angle_initialisation = 1;
+        public static decimal max_angle_initialisation = (decimal)1;
         public const long M_in_Lsecond = 299792458;
-        public const decimal grav_const = 0.000000000066743;
+        public const decimal grav_const = (decimal)0.000000000066743;
         public static  Microsoft.Extensions.Logging.LogLevel Level = Microsoft.Extensions.Logging.LogLevel.Trace;
         public static ILogger log = new Logger().log;
     }

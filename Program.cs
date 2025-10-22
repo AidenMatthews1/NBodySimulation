@@ -412,8 +412,6 @@ public abstract class Volume : updateAble, mass
 
     public abstract void update();
 
-    //public abstract void updateMass();
-
     public abstract void updateCOM();
 }
 
@@ -453,32 +451,54 @@ public class BVolume : Volume
             // Thought about individually dividing the Axis BEFORE multiplication but that will result in very small deximals instead which is a whole other can of worms
 
             decimal angle;
+            decimal temp;
             try
             {
-                decimal temp = checked(((Convert.ToDecimal(a.x) * b.x) / a.magnitude() + (Convert.ToDecimal(a.y) * b.y) / a.magnitude() + (Convert.ToDecimal(a.z) * b.z) / a.magnitude()) / b.magnitude());
-                
-                angle = (decimal)Math.Acos(temp);
-                if (temp > 1)
-                {
-                    angle = 0;
-                }
-                if (temp < -1)
-                {
-                    angle = (decimal)Math.PI;
-                }
-                //Console.WriteLine(angle * 180 / Math.PI);
+                temp = checked(((Convert.ToDecimal(a.x) * b.x) / a.magnitude() + (Convert.ToDecimal(a.y) * b.y) / a.magnitude() + (Convert.ToDecimal(a.z) * b.z) / a.magnitude()) / b.magnitude());
                 //angle = (decimal)Math.Acos(checked(((Convert.ToDouble(a.x) /a.magnitude()) * b.x/ a.magnitude() + (Convert.ToDouble(a.y)/a.magnitude()) * b.y/ a.magnitude() + (Convert.ToDouble(a.z)/a.magnitude()) * b.z/ a.magnitude()) / b.magnitude()));
             }
             catch (Exception e)
             {
-                globalVariables.log.LogCritical($"Likely Arithmetic Overflow while initialising. Attempted to calculate angle between two vectors:\n{a.ToString()}\n{b.ToString()}\nmax integer value: {Int64.MaxValue}");
-                globalVariables.log.LogTrace(((Convert.ToDouble(a.x) * b.x) / a.magnitude()).ToString());
-                globalVariables.log.LogTrace(((Convert.ToDouble(a.y) * b.y) / a.magnitude()).ToString());
-                globalVariables.log.LogTrace(((Convert.ToDouble(a.z) * b.z) / a.magnitude()).ToString());
+                globalVariables.log.LogWarning($"An Exception likely Arithmetic Overflow  was silently ignored while initialising. Attempted to calculate angle between two vectors:\n{a.ToString()}\n{b.ToString()}\nmax integer value: {Int64.MaxValue}");
+                globalVariables.log.LogTrace((((decimal)(a.x) * b.x) / a.magnitude()).ToString());
+                globalVariables.log.LogTrace((((decimal)(a.y) * b.y) / a.magnitude()).ToString());
+                globalVariables.log.LogTrace((((decimal)(a.z) * b.z) / a.magnitude()).ToString());
                 globalVariables.log.LogTrace(b.magnitude().ToString());
-                globalVariables.log.LogCritical(e.Message);
-                throw new OverflowException();
+                globalVariables.log.LogWarning(e.Message);
+
+                temp = ((Convert.ToDecimal(a.x) * b.x) / a.magnitude() + (Convert.ToDecimal(a.y) * b.y) / a.magnitude() + (Convert.ToDecimal(a.z) * b.z) / a.magnitude()) / b.magnitude();
+                Console.WriteLine(temp);
+                
             }
+
+            if (temp > 1)
+            {
+                angle = 0M;
+                globalVariables.log.LogTrace("Angle between vectors was outside bounds likely due to rounding error, setting to 0");
+            }
+            else
+            {
+                if (temp < -1)
+                {
+                    angle = (decimal)Math.PI;
+                    globalVariables.log.LogTrace("Angle between vectors was outside bounds likely due to rounding error, setting to 180");
+                }
+                else
+                {
+                    try
+                    {
+                        angle = (decimal)Math.Acos((double)temp);
+                    }
+                    catch
+                    {
+                        globalVariables.log.LogWarning("Unable to calculate angle between vectors setting to 0");
+                        globalVariables.log.LogWarning(temp.ToString());
+                        globalVariables.log.LogWarning(Math.Acos((double)temp).ToString());
+                        angle = 0M;
+                    }        
+                }    
+            }
+            
             return angle;
         }
 
@@ -487,10 +507,17 @@ public class BVolume : Volume
             Volume currentTarget = candidates[0];
             if (simplifiedInteractions.Contains(currentTarget) | fullInteractions.Contains(currentTarget))
             {
-                Console.WriteLine("Removed target already checked");
-                Console.WriteLine(currentTarget.ToString());
+                globalVariables.log.LogTrace("Removed target already checked");
+                globalVariables.log.LogTrace(currentTarget.ToString());
                 candidates.RemoveAt(0);
-                Console.WriteLine(candidates[0].ToString());
+                globalVariables.log.LogTrace(candidates[0].ToString());
+                continue;
+            }
+
+            if (currentTarget == this)
+            {
+                //globalVariables.log.LogTrace("Removed self from candidates");
+                candidates.RemoveAt(0);
                 continue;
             }
 
@@ -501,7 +528,7 @@ public class BVolume : Volume
             {
                 if (simplifiedInteractions.Contains(parent))
                 {
-                    Console.WriteLine("Removed target with simplified parent");
+                    globalVariables.log.LogTrace("Removed target with simplified parent");
                     candidates.RemoveAt(0);
                     continue;
                 }
@@ -558,20 +585,27 @@ public class BVolume : Volume
         return Children;
     }
 
+    // Separated into own function as there may be other special objects in the future
+    public IEnumerable<mass> getMassiveObjects()
+    {
+        IEnumerable<mass> massiveObjects = MChildren;
+        return massiveObjects;
+    } 
+
     public override void updateCOM()
     {
         // Done with temp values to limit possible race conditions in multithread scenario.
         // If reseting mass and COM while doing calculations any other threads will be getting incorrect data
         // Better to give them out of date values instead
         //Vector newCOM = new Vector(Center);
-        float newMass = 0;
-        double xPosOffset = 0;
-        double yPosOffset = 0;
-        double zPosOffset = 0;
+        double newMass = 0;
+        decimal xPosOffset = 0;
+        decimal yPosOffset = 0;
+        decimal zPosOffset = 0;
 
         foreach (Body child in MChildren)
         {
-            decimal Ratio = (newMass + child.Mass) / child.Mass;
+            decimal Ratio = (decimal)((newMass + child.Mass) / child.Mass);
             // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
             decimal[] Direction = child.Position.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
             xPosOffset += Direction[0] * Ratio;
@@ -589,12 +623,31 @@ public class BVolume : Volume
         {
             globalVariables.log.LogError($"Updating COM resulted in COM outside of boundaries. newCOM has been ignored, falling back to old value. \n{this.ToString()} \n{newCOM.ToString()}");
         }
-        
+
     }
 
     public override void update()
     {
-        throw new System.NotImplementedException();
+        // Find mass array
+        // TODO Would be good to allocate array size at the start instead of dynamically resizing for every new list but that would add complexity we dont need in MVP
+        // TODO can likely save simplified interactions as flat veloc applications that get updated on a Major Instead of getting every body to calculate them every time
+        List<mass> Influences = new List<mass>();
+        Influences.AddRange(MChildren);
+        Influences.AddRange(simplifiedInteractionVolumes);
+        foreach (BVolume fullInteraction in fullInteractionVolumes)
+        {
+            Influences.AddRange(fullInteraction.getMassiveBodies());
+        }
+        mass[] influencesArray = Influences.ToArray();
+
+        foreach (Body body in MChildren)
+        {
+            body.calculateManyForce(influencesArray);
+        }
+        foreach (Body body in NMChildren)
+        {
+            body.calculateManyForce(influencesArray);
+        }
     }
 
 
@@ -618,16 +671,6 @@ public class BVolume : Volume
         }
     }
 
-    // public override void updateMass()
-    // {
-    //     // Done with temp values to limit possible race condition in multithread scenario
-    //     float tempMass = 0;
-    //     foreach (Body child in MChildren)
-    //     {
-    //         tempMass += child.Mass;
-    //     }
-    //     this.Mass = tempMass;
-    // }
 }
 
 public class RVolume : Volume
@@ -726,7 +769,7 @@ public class RVolume : Volume
         if (this.withinBoundaries(newBody.Position))
         {
             AVolume targetChild = Children.First();
-            double distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+            decimal distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
 
             foreach (AVolume child in Children)
             {
@@ -843,15 +886,15 @@ public class AVolume : Volume
     public override void updateCOM()
     {
         // See BVolume updateCom for rational and explanation
-        float newMass = 0;
-        double xPosOffset = 0;
-        double yPosOffset = 0;
-        double zPosOffset = 0;
+        double newMass = 0;
+        decimal xPosOffset = 0;
+        decimal yPosOffset = 0;
+        decimal zPosOffset = 0;
 
         foreach (Volume child in Children)
         {
             child.updateCOM();
-            decimal Ratio = (decimal)(newMass + child.Mass) / child.Mass;
+            decimal Ratio = (decimal)((newMass + child.Mass) / child.Mass);
             // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
             decimal[] Direction = child.COM.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
             xPosOffset += Direction[0] * Ratio;
@@ -916,7 +959,9 @@ public class AVolume : Volume
 public class Body : mass
 {
     // Center of Mass used even though not all bodies will be "massive" to comply with mass interface standards
-    public dynamicPosition COM { get; set; }
+    public dynamicPosition Position { get; set; }
+
+    public Vector COM {get{ return Position as Vector; }}
 
     public ulong Radius { get; protected set; }
 
@@ -926,27 +971,27 @@ public class Body : mass
 
     public bool Massive { get; protected set; }
 
-    public void applyForceNewtons(decimal forcex, decimal forcey, decimal forcez)
+    public void applyForceNewtons(double forcex, double forcey, double forcez)
     {
-        long velx = (long)forcex / Mass;
-        long vely = (long)forcey / Mass;
-        long velz = (long)forcez / Mass;
+        long velx = (long)(forcex / Mass);
+        long vely = (long)(forcey / Mass);
+        long velz = (long)(forcez / Mass);
 
-        this.COM.addVel(velx, vely, velz);
+        this.Position.addVel(velx, vely, velz);
     }
     
     public void applyVeloc(long velx, long vely, long velz)
     {
-        this.COM.addVel(velx, vely, velz);
+        this.Position.addVel(velx, vely, velz);
     }
 
-    public void calculateManyForce(mass[] incluences)
+    public void calculateManyForce(mass[] influences)
     {
         // Will calculate the gravitational attraction from many masses, Skips some steps to directly calculting velocity change instead of forces
         decimal velx = 0;
         decimal vely = 0;
         decimal velz = 0;
-        Vector unitDir;
+        decimal[] unitDir;
         // Usually magnitude is stored as a decimal but in this case it will soon be squared so need a larger cap
         double magnitude;
         decimal force;
@@ -954,23 +999,25 @@ public class Body : mass
         {
             unitDir = this.COM.unitVectorToo(influence.COM);
             magnitude = (double)this.COM.distanceToo(influence.COM);
-            force = checked(globalVariables.grav_const *  influence.Mass / Math.Pow(magnitude, 2));
+            // Important that the type case to decimal happens AFTER the division as otherwise mass is allowed to be above the limit 
+            // TODO There should be a check here that magnitude isnt too low
+            force = checked(globalVariables.grav_const *  (decimal)(influence.Mass / Math.Pow(magnitude, 2)));
 
             velx += force * unitDir[0];
             vely += force * unitDir[1];
             velz += force * unitDir[2];
         }
-        applyVeloc((long)Math.Round(forcex), (long)Math.Round(forcey), (long)Math.Round(forcez));
+        applyVeloc((long)Math.Round(velx), (long)Math.Round(vely), (long)Math.Round(velz));
     }
 }
 
-interface updateAble
+public interface updateAble
 {
     public void update();
     public void updateMajor();
 }
 
-interface mass
+public interface mass
 {
     public double Mass { get; }
     public Vector COM { get; }
