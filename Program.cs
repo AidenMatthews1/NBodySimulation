@@ -72,31 +72,30 @@ public class Vector
     }
 
 
-    public double distanceToo(Vector target)
+    public decimal distanceToo(Vector target)
     {
-        Int64[] targetcoords = target.getPos();
-        UInt64 xdiff = Convert.ToUInt64(this.x - targetcoords[0]);
-        UInt64 ydiff = Convert.ToUInt64(this.y - targetcoords[1]);
-        UInt64 zdiff = Convert.ToUInt64(this.z - targetcoords[2]);
+        UInt64 xdiff = Convert.ToUInt64(this.x - target.x);
+        UInt64 ydiff = Convert.ToUInt64(this.y - target.y);
+        UInt64 zdiff = Convert.ToUInt64(this.z - target.z);
 
-        double magnitude = Math.Sqrt(Math.Pow(xdiff, 2) + Math.Pow(ydiff, 2) + Math.Pow(zdiff, 2));
+        decimal magnitude = (decimal)Math.Sqrt(Math.Pow(xdiff, 2) + Math.Pow(ydiff, 2) + Math.Pow(zdiff, 2));
         return magnitude;
     }
 
-    public double[] unitVectorToo(Vector target)
+    public decimal[] unitVectorToo(Vector target)
     {
        return unitVectorToo(target.x, target.y, target.z);
     }
 
     // TODO Need to think deeply about floating point error here and if I can do anything about it
-    public double[] unitVectorToo(long targetx, long targety, long targetz)
+    public decimal[] unitVectorToo(long targetx, long targety, long targetz)
     {
         long xDifference = this.x - targetx;
         long yDifference = this.y - targety;
         long zDifference = this.z - targetz;
-        double magnitude = Math.Sqrt(Math.Pow(xDifference, 2) + Math.Pow(yDifference, 2) + Math.Pow(zDifference, 2));
+        decimal magnitude = (decimal)(Math.Sqrt(Math.Pow(xDifference, 2) + Math.Pow(yDifference, 2) + Math.Pow(zDifference, 2)));
         //decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
-        double[] temp = { Convert.ToDouble(xDifference) / magnitude, Convert.ToDouble(yDifference) / magnitude, Convert.ToDouble(zDifference) / magnitude };
+        decimal[] temp = { Convert.ToDecimal(xDifference) / magnitude, Convert.ToDecimal(yDifference) / magnitude, Convert.ToDecimal(zDifference) / magnitude };
         return temp;
     }
 
@@ -107,15 +106,15 @@ public class Vector
 
     public Vector vectorToo(long targetx, long targety, long targetz)
     {
-        long xDifference = this.x - targetx;
-        long yDifference = this.y - targety;
-        long zDifference = this.z - targetz;
+        long xDifference = targetx - this.x;
+        long yDifference = targety - this.y;
+        long zDifference = targetz - this.z;
         return new Vector(xDifference, yDifference, zDifference);
     }
 
-    public double magnitude()
+    public decimal magnitude()
     {
-        return checked(Math.Sqrt(Math.Pow(x,2) + Math.Pow(y,2) + Math.Pow(z,2)));
+        return checked((decimal)(Math.Sqrt(Math.Pow(x,2) + Math.Pow(y,2) + Math.Pow(z,2))));
     }
 
     public override string ToString()
@@ -177,9 +176,9 @@ public class dynamicPosition : Vector, updateAble
     //     return [this.xvel, this.yvel, this.zvel];
     // }
 
-    protected double velMagnitude()
+    protected decimal velMagnitude()
     {
-        return Math.Sqrt(Math.Pow(xvel,2) + Math.Pow(yvel,2) + Math.Pow(zvel,2));
+        return (decimal)(Math.Sqrt(Math.Pow(xvel,2) + Math.Pow(yvel,2) + Math.Pow(zvel,2)));
     }
 
     public override global::System.String ToString()
@@ -202,7 +201,7 @@ public abstract class Volume : updateAble, mass
     public long lowerZBound { get; protected set; }
     public long upperZBound { get; protected set; }
     public Vector COM { get; protected set; }
-    public float Mass { get; protected set; }
+    public double Mass { get; protected set; }
 
     public Guid id {get; protected set;}
 
@@ -442,7 +441,7 @@ public class BVolume : Volume
         List<Volume> simplifiedInteractions = new List<Volume>();
         List<BVolume> fullInteractions = new List<BVolume>();
 
-        double calcAngle(Vector a, Vector b)
+        decimal calcAngle(Vector a, Vector b)
         {
             // theta = cos^(-1)(a.b/(|a||b|))
             // product of the magnitudes is likely to result in an overflow 
@@ -453,19 +452,19 @@ public class BVolume : Volume
             // This way the entire dot product and the product of the magnitde doesnt need to be calculated. Still dealing with very large numbers but not as large as product of magnitudes  
             // Thought about individually dividing the Axis BEFORE multiplication but that will result in very small deximals instead which is a whole other can of worms
 
-            double angle;
+            decimal angle;
             try
             {
-                double temp = checked(((Convert.ToDouble(a.x) * b.x) / a.magnitude() + (Convert.ToDouble(a.y) * b.y) / a.magnitude() + (Convert.ToDouble(a.z) * b.z) / a.magnitude()) / b.magnitude());
+                decimal temp = checked(((Convert.ToDecimal(a.x) * b.x) / a.magnitude() + (Convert.ToDecimal(a.y) * b.y) / a.magnitude() + (Convert.ToDecimal(a.z) * b.z) / a.magnitude()) / b.magnitude());
                 
-                angle = Math.Acos(temp);
+                angle = (decimal)Math.Acos(temp);
                 if (temp > 1)
                 {
                     angle = 0;
                 }
                 if (temp < -1)
                 {
-                    angle = Math.PI;
+                    angle = (decimal)Math.PI;
                 }
                 //Console.WriteLine(angle * 180 / Math.PI);
                 //angle = (decimal)Math.Acos(checked(((Convert.ToDouble(a.x) /a.magnitude()) * b.x/ a.magnitude() + (Convert.ToDouble(a.y)/a.magnitude()) * b.y/ a.magnitude() + (Convert.ToDouble(a.z)/a.magnitude()) * b.z/ a.magnitude()) / b.magnitude()));
@@ -519,7 +518,7 @@ public class BVolume : Volume
 
             Vector lowerTarget = new Vector(Center.x - currentTarget.lowerXBound, Center.y - currentTarget.lowerYBound, Center.z - currentTarget.lowerZBound);
             Vector upperTarget = new Vector(Center.x - currentTarget.upperXBound, Center.y - currentTarget.upperYBound, Center.z - currentTarget.upperZBound);
-            double angle = calcAngle(lowerTarget, upperTarget);
+            decimal angle = calcAngle(lowerTarget, upperTarget);
 
             // If its far enough away that we can simplify the interactions
             if (angle <= globalVariables.max_angle_initialisation)
@@ -572,12 +571,12 @@ public class BVolume : Volume
 
         foreach (Body child in MChildren)
         {
-            float Ratio = (newMass + child.Mass) / child.Mass;
+            decimal Ratio = (newMass + child.Mass) / child.Mass;
             // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
-            double[] Direction = child.Position.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
-            xPosOffset += Direction[0] * (double)Ratio;
-            yPosOffset += Direction[1] * (double)Ratio;
-            zPosOffset += Direction[2] * (double)Ratio;
+            decimal[] Direction = child.Position.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+            xPosOffset += Direction[0] * Ratio;
+            yPosOffset += Direction[1] * Ratio;
+            zPosOffset += Direction[2] * Ratio;
             newMass += child.Mass;
         }
         Vector newCOM = new Vector(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
@@ -852,12 +851,12 @@ public class AVolume : Volume
         foreach (Volume child in Children)
         {
             child.updateCOM();
-            float Ratio = (newMass + child.Mass) / child.Mass;
+            decimal Ratio = (decimal)(newMass + child.Mass) / child.Mass;
             // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
-            double[] Direction = child.COM.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
-            xPosOffset += Direction[0] * (double)Ratio;
-            yPosOffset += Direction[1] * (double)Ratio;
-            zPosOffset += Direction[2] * (double)Ratio;
+            decimal[] Direction = child.COM.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+            xPosOffset += Direction[0] * Ratio;
+            yPosOffset += Direction[1] * Ratio;
+            zPosOffset += Direction[2] * Ratio;
             newMass += child.Mass;
         }
         
@@ -877,7 +876,7 @@ public class AVolume : Volume
         if (this.withinBoundaries(newBody.Position))
         {
             Volume targetChild = Children.First();
-            double distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+            decimal distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
 
             foreach (Volume child in Children)
             {
@@ -927,7 +926,42 @@ public class Body : mass
 
     public bool Massive { get; protected set; }
 
-    public void applyForce(mass[] )
+    public void applyForceNewtons(decimal forcex, decimal forcey, decimal forcez)
+    {
+        long velx = (long)forcex / Mass;
+        long vely = (long)forcey / Mass;
+        long velz = (long)forcez / Mass;
+
+        this.COM.addVel(velx, vely, velz);
+    }
+    
+    public void applyVeloc(long velx, long vely, long velz)
+    {
+        this.COM.addVel(velx, vely, velz);
+    }
+
+    public void calculateManyForce(mass[] incluences)
+    {
+        // Will calculate the gravitational attraction from many masses, Skips some steps to directly calculting velocity change instead of forces
+        decimal velx = 0;
+        decimal vely = 0;
+        decimal velz = 0;
+        Vector unitDir;
+        // Usually magnitude is stored as a decimal but in this case it will soon be squared so need a larger cap
+        double magnitude;
+        decimal force;
+        foreach (mass influence in influences)
+        {
+            unitDir = this.COM.unitVectorToo(influence.COM);
+            magnitude = (double)this.COM.distanceToo(influence.COM);
+            force = checked(globalVariables.grav_const *  influence.Mass / Math.Pow(magnitude, 2));
+
+            velx += force * unitDir[0];
+            vely += force * unitDir[1];
+            velz += force * unitDir[2];
+        }
+        applyVeloc((long)Math.Round(forcex), (long)Math.Round(forcey), (long)Math.Round(forcez));
+    }
 }
 
 interface updateAble
