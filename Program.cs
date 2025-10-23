@@ -21,12 +21,22 @@ Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToSt
 Console.WriteLine("Hello, World!");
 //Console.WriteLine(globalVariables.units_in_m);
 
-RVolume test = new RVolume(globalVariables.M_in_Lsecond*globalVariables.Units_in_M,8, 8, 8, 2, 2);
+RVolume test = new RVolume(globalVariables.M_in_Lsecond * globalVariables.Units_in_M, 8, 8, 8, 2, 2);
+Body body1 = new Body(100000000000, 1, 1, 1);
+Body body2 = new Body(1, 1000, 1000, 1000);
+test.injestBody(body1);
+test.injestBody(body2);
+test.initialise();
 Console.WriteLine(test.ToString());
+Console.WriteLine(body1.Parent.ToString());
+Console.WriteLine(body2.Parent.ToString());
 
-
-
+while(Console.ReadLine() != "s")
+{
+    test.update();
+}
 // Basic Class Definitions ----------------------------------------------------
+
 
 public class positioningException : System.Exception
 {
@@ -74,9 +84,9 @@ public class Vector
 
     public decimal distanceToo(Vector target)
     {
-        UInt64 xdiff = Convert.ToUInt64(this.x - target.x);
-        UInt64 ydiff = Convert.ToUInt64(this.y - target.y);
-        UInt64 zdiff = Convert.ToUInt64(this.z - target.z);
+        long xdiff = this.x - target.x;
+        long ydiff = this.y - target.y;
+        long zdiff = this.z - target.z;
 
         decimal magnitude = (decimal)Math.Sqrt(Math.Pow(xdiff, 2) + Math.Pow(ydiff, 2) + Math.Pow(zdiff, 2));
         return magnitude;
@@ -84,15 +94,15 @@ public class Vector
 
     public decimal[] unitVectorToo(Vector target)
     {
-       return unitVectorToo(target.x, target.y, target.z);
+        return unitVectorToo(target.x, target.y, target.z);
     }
 
     // TODO Need to think deeply about floating point error here and if I can do anything about it
     public decimal[] unitVectorToo(long targetx, long targety, long targetz)
     {
-        long xDifference = this.x - targetx;
-        long yDifference = this.y - targety;
-        long zDifference = this.z - targetz;
+        long xDifference = targetx - this.x;
+        long yDifference = targety - this.y;
+        long zDifference = targetz - this.z;
         decimal magnitude = (decimal)(Math.Sqrt(Math.Pow(xDifference, 2) + Math.Pow(yDifference, 2) + Math.Pow(zDifference, 2)));
         //decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
         decimal[] temp = { Convert.ToDecimal(xDifference) / magnitude, Convert.ToDecimal(yDifference) / magnitude, Convert.ToDecimal(zDifference) / magnitude };
@@ -204,6 +214,7 @@ public abstract class Volume : updateAble, mass
     public double Mass { get; protected set; }
 
     public Guid id {get; protected set;}
+
 
     protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound)
     {
@@ -422,7 +433,9 @@ public class BVolume : Volume
     // This is sketchy not sure if I want to set it up like this long term
     //public List<Body>? Children { get { return new List<Body>().AddRange(NMChildren).AddRange(MChildren); } private set; }
     public List<Body> NMChildren { get; private set; }
-    public List<Body> MChildren { get; private set; }
+
+    // This should have protected set and a method to provide a readonly list but I cant figure it out and I dont have time ot figure it out
+    public List<Body> MChildren { get; set; }
 
     public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
@@ -574,6 +587,8 @@ public class BVolume : Volume
 
         this.simplifiedInteractionVolumes = simplifiedInteractions.ToArray();
         this.fullInteractionVolumes = fullInteractions.ToArray();
+
+        this.updateCOM();
         globalVariables.log.LogTrace($"{this.ToString()} has finished finding simplified interactions {simplifiedInteractions.Count()}, {fullInteractions.Count()}");
     }
 
@@ -585,12 +600,17 @@ public class BVolume : Volume
         return Children;
     }
 
-    // Separated into own function as there may be other special objects in the future
-    public IEnumerable<mass> getMassiveObjects()
-    {
-        IEnumerable<mass> massiveObjects = MChildren;
-        return massiveObjects;
-    } 
+
+    // Separated into own function as there may be other special objects in the future and needs to return a read only list somehow
+    // public ReadOnlyCollection<mass> getMassiveObjects()
+    // {
+    //     ReadOnlyCollection<mass> massiveObjects = MChildren;
+    //     foreach (mass test in massiveObjects)
+    //     {
+    //         Console.WriteLine(test);
+    //     }
+    //     return massiveObjects;
+    // } 
 
     public override void updateCOM()
     {
@@ -636,17 +656,26 @@ public class BVolume : Volume
         Influences.AddRange(simplifiedInteractionVolumes);
         foreach (BVolume fullInteraction in fullInteractionVolumes)
         {
-            Influences.AddRange(fullInteraction.getMassiveBodies());
+            Influences.AddRange(fullInteraction.MChildren);
         }
+
         mass[] influencesArray = Influences.ToArray();
 
         foreach (Body body in MChildren)
         {
             body.calculateManyForce(influencesArray);
+            if (!this.withinBoundaries(body.COM))
+            {
+                this.Parent.injestBody(body);
+            }
         }
         foreach (Body body in NMChildren)
         {
             body.calculateManyForce(influencesArray);
+            if (!this.withinBoundaries(body.COM))
+            {
+                this.Parent.injestBody(body);
+            }
         }
     }
 
@@ -958,6 +987,7 @@ public class AVolume : Volume
 
 public class Body : mass
 {
+    public Guid id {get; protected set;}
     // Center of Mass used even though not all bodies will be "massive" to comply with mass interface standards
     public dynamicPosition Position { get; set; }
 
@@ -965,11 +995,37 @@ public class Body : mass
 
     public ulong Radius { get; protected set; }
 
-    public Volume Parent { get; set; }
+    public Volume? Parent { get; set; }
 
     public double Mass { get; protected set; }
 
     public bool Massive { get; protected set; }
+
+    protected Body(double mass)
+    {
+        this.id = Guid.NewGuid();
+        this.Mass = mass;
+        Radius = 1;
+
+        if (mass >= globalVariables.min_massive_weight)
+        {
+            Massive = true;
+        }
+        else
+        {
+            Massive = false;
+        }        
+    }
+
+    public Body(double mass, long x, long y, long z) : this(mass)
+    {
+        Position = new dynamicPosition(x, y, z);
+    }
+    
+    public Body(double mass, long x, long y, long z, long xvel, long yvel, long zvel) : this(mass)
+    {
+        Position = new dynamicPosition(x, y, z, xvel, yvel, zvel);
+    }
 
     public void applyForceNewtons(double forcex, double forcey, double forcez)
     {
@@ -988,6 +1044,7 @@ public class Body : mass
     public void calculateManyForce(mass[] influences)
     {
         // Will calculate the gravitational attraction from many masses, Skips some steps to directly calculting velocity change instead of forces
+        Console.WriteLine($"Body calculating forces from {influences.Length} objects");
         decimal velx = 0;
         decimal vely = 0;
         decimal velz = 0;
@@ -997,17 +1054,34 @@ public class Body : mass
         decimal force;
         foreach (mass influence in influences)
         {
+            if (influence == this)
+            {
+                continue;
+            }
             unitDir = this.COM.unitVectorToo(influence.COM);
             magnitude = (double)this.COM.distanceToo(influence.COM);
             // Important that the type case to decimal happens AFTER the division as otherwise mass is allowed to be above the limit 
             // TODO There should be a check here that magnitude isnt too low
-            force = checked(globalVariables.grav_const *  (decimal)(influence.Mass / Math.Pow(magnitude, 2)));
+            force = checked(globalVariables.grav_const * (decimal)(influence.Mass / Math.Pow(magnitude/globalVariables.Units_in_M, 2)));
 
             velx += force * unitDir[0];
             vely += force * unitDir[1];
             velz += force * unitDir[2];
+
+            //Console.WriteLine($"{influence.ToString()}");
+            // Console.WriteLine($"{force}");
+            // Console.WriteLine($"{magnitude}");
+            // Console.WriteLine($"{(decimal)(influence.Mass / Math.Pow(magnitude, 2))}");
         }
+        Console.WriteLine($"{velx} {vely} {velz}");
         applyVeloc((long)Math.Round(velx), (long)Math.Round(vely), (long)Math.Round(velz));
+        Console.WriteLine(this.ToString());
+        this.Position.update();
+    }
+    
+    public override string ToString()
+    {
+        return $"{this.id} Body child of {this.Parent} at {this.Position}, {this.Mass}, {this.Massive}, {this.Radius}";
     }
 }
 
