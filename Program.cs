@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 
-
 Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToString()}");
 
 RVolume root = new RVolume(100 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
@@ -19,25 +18,25 @@ IEnumerable<string> rows = File.ReadLines("bodies.csv");
 foreach (string row in rows)
 {
     string[] values = row.Split(',');
-    if (values.Length != 7)
+    if (values.Length != 8)
     {
         throw new ArgumentException($"CSV Row was the wrong size {values.Length}");
     }
     else
     {
-        root.injestBody(new Body(Convert.ToDouble(values[0]), long.Parse(values[1]), long.Parse(values[2]), long.Parse(values[3]), long.Parse(values[4]), long.Parse(values[5]), long.Parse(values[6])));
-
+        root.injestBody(new Body(Guid.Parse(values[0]), Convert.ToDouble(values[1]), long.Parse(values[2]), long.Parse(values[3]), long.Parse(values[4]), long.Parse(values[5]), long.Parse(values[6]), long.Parse(values[7])));
     }
 }
+globalVariables.log.LogInformation($"Successfully ingested {root.getContainedBodies().Count()} Bodies");
 
 
 root.initialise();
-Console.WriteLine(root.ToString());
+globalVariables.log.LogInformation(root.ToString());
 // Console.WriteLine(body1.ToString());
 // Console.WriteLine(body2.ToString());
 
 var watch = Stopwatch.StartNew();
-root.updateMany(4600);
+root.updateMany(10000);
 watch.Stop();
 Console.WriteLine("Claimed time:");
 Console.WriteLine(watch.ElapsedMilliseconds.ToString());
@@ -1090,7 +1089,7 @@ public class Body : mass
 
     protected Body(double mass)
     {
-        this.id = Guid.NewGuid();
+        
         this.Mass = mass;
         Radius = 1;
 
@@ -1101,6 +1100,11 @@ public class Body : mass
         else
         {
             Massive = false;
+        }
+
+        if (this.id == null)
+        {
+            this.id = Guid.NewGuid();
         }        
     }
 
@@ -1108,10 +1112,15 @@ public class Body : mass
     {
         Position = new dynamicPosition(x, y, z);
     }
-    
+
     public Body(double mass, long x, long y, long z, long xvel, long yvel, long zvel) : this(mass)
     {
         Position = new dynamicPosition(x, y, z, xvel, yvel, zvel);
+    }
+    
+    public Body(Guid id, double mass, long x, long y, long z, long xvel, long yvel, long zvel) : this(mass, x, y, z, xvel, yvel, zvel)
+    {
+        this.id = id;
     }
 
     public override string ToString()
