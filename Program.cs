@@ -3,40 +3,39 @@
 using Globals;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics;
 
-// Microsoft.Extensions.Logging.ILoggerFactory loggerFactory = new Microsoft.Extensions.Logging.LoggerFactory(
-//     new[] {new Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider((_,__) => true, true)}
-// );
-
-// Microsoft.Extensions.Logging.ILoggerFactory loggerFactory = new Microsoft.Extensions.Logging.LoggerFactory();
-// Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.Extensions.Logging.Console.ConsoleLoggerOptions> temp = new Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.Extensions.Logging.Console.ConsoleLoggerOptions>();
-// loggerFactory.AddProvider(new Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider(temp));
-// Microsoft.Extensions.Logging.ILogger log = loggerFactory.CreateLogger("Console");
-
-// bool logFilter(Microsoft.Extensions.Logging.LogLevel levelCheck) {
-//     if levelCheck.
-// }
 
 Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToString()}");
-Console.WriteLine("Hello, World!");
-//Console.WriteLine(globalVariables.units_in_m);
 
-RVolume test = new RVolume(globalVariables.M_in_Lsecond * globalVariables.Units_in_M, 8, 8, 8, 2, 2);
-Body body1 = new Body(100000000000, 1, 1, 1);
-Body body2 = new Body(1, 1000, 1000, 1000);
+RVolume test = new RVolume(100 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
+Body body1 = new Body((double)Math.Pow(10,15), 190000, 0, 0);
+Body body2 = new Body(1, 0, 0, 0);
 test.injestBody(body1);
 test.injestBody(body2);
 test.initialise();
 Console.WriteLine(test.ToString());
-Console.WriteLine(body1.Parent.ToString());
-Console.WriteLine(body2.Parent.ToString());
+Console.WriteLine(body1.ToString());
+Console.WriteLine(body2.ToString());
 
-while(Console.ReadLine() != "s")
-{
-    test.update();
-}
+var watch = Stopwatch.StartNew();
+test.updateMany(100);
+watch.Stop();
+Console.WriteLine("Claimed time:");
+Console.WriteLine(watch.ElapsedMilliseconds.ToString());
+
+// while(Console.ReadLine() != "s")
+// {
+//     Console.WriteLine("NEW UPDATE");
+//     foreach (Body a in test.getContainedBodies())
+//     {
+//         Console.WriteLine(a.ToString());
+//     }
+//     Console.WriteLine("--------------");
+//     test.update();
+// }
+
 // Basic Class Definitions ----------------------------------------------------
-
 
 public class positioningException : System.Exception
 {
@@ -81,6 +80,7 @@ public class Vector
         return [this.x, this.y, this.z];
     }
 
+    //public static implicit operator long[](Vector a) => new long[] {a.x, a.y, a.z}; 
 
     public decimal distanceToo(Vector target)
     {
@@ -103,6 +103,11 @@ public class Vector
         long xDifference = targetx - this.x;
         long yDifference = targety - this.y;
         long zDifference = targetz - this.z;
+
+        // Console.WriteLine(xDifference.ToString());
+        // Console.WriteLine(yDifference.ToString());
+        // Console.WriteLine(zDifference.ToString());
+
         decimal magnitude = (decimal)(Math.Sqrt(Math.Pow(xDifference, 2) + Math.Pow(yDifference, 2) + Math.Pow(zDifference, 2)));
         //decimal[] temp = { Convert.ToDecimal(xDifference / magnitude), Convert.ToDecimal(yDifference / magnitude), Convert.ToDecimal(zDifference / magnitude) };
         decimal[] temp = { Convert.ToDecimal(xDifference) / magnitude, Convert.ToDecimal(yDifference) / magnitude, Convert.ToDecimal(zDifference) / magnitude };
@@ -256,6 +261,11 @@ public abstract class Volume : updateAble, mass
     public override string ToString()
     {
         return $"{this.GetType()} {this.id.ToString()} Centered at {this.Center.ToString()}, total Mass {Mass} with parent {Parent.GetType()}.";
+    }
+
+    public string idToString()
+    {
+        return $"{this.GetType().ToString()} {this.id.ToString()}";
     }
 
     public virtual RVolume getRoot()
@@ -437,6 +447,9 @@ public class BVolume : Volume
     // This should have protected set and a method to provide a readonly list but I cant figure it out and I dont have time ot figure it out
     public List<Body> MChildren { get; set; }
 
+    // there needs to be a better way of doing this
+    private List<Body> allChildren { get { List<Body> temp = new List<Body>(); temp.AddRange(MChildren); temp.AddRange(NMChildren); return temp; } }
+
     public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
         //globalVariables.log.LogTrace($"BVolume constructor called with boundaries  {LowerXBound},  {UpperXBound},  {LowerYBound},  {UpperYBound},  {LowerZBound},  {UpperZBound}");
@@ -449,6 +462,7 @@ public class BVolume : Volume
     {
         List<Volume> candidates = new List<Volume>();
         candidates.AddRange(getRoot().Children);
+        // TODO these simplified Interactions effects are the same for every body can do some simplifications here
         List<Volume> simplifiedInteractions = new List<Volume>();
         List<BVolume> fullInteractions = new List<BVolume>();
 
@@ -589,7 +603,12 @@ public class BVolume : Volume
         this.fullInteractionVolumes = fullInteractions.ToArray();
 
         this.updateCOM();
-        globalVariables.log.LogTrace($"{this.ToString()} has finished finding simplified interactions {simplifiedInteractions.Count()}, {fullInteractions.Count()}");
+        // globalVariables.log.LogTrace($"{this.ToString()} has finished finding simplified interactions {simplifiedInteractions.Count()}, {fullInteractions.Count()}");
+        // if(this.Center.x != this.COM.x)
+        // {
+        //     Console.WriteLine("SUCCESS");
+        //     Console.WriteLine(this.COM.ToString());
+        // }
     }
 
     public override List<Body> getContainedBodies()
@@ -619,6 +638,7 @@ public class BVolume : Volume
         // Better to give them out of date values instead
         //Vector newCOM = new Vector(Center);
         double newMass = 0;
+
         decimal xPosOffset = 0;
         decimal yPosOffset = 0;
         decimal zPosOffset = 0;
@@ -626,11 +646,12 @@ public class BVolume : Volume
         foreach (Body child in MChildren)
         {
             decimal Ratio = (decimal)((newMass + child.Mass) / child.Mass);
-            // Calculating this every time instead of storing an updating might be a pretty slow way of doing this 
-            decimal[] Direction = child.Position.unitVectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
-            xPosOffset += Direction[0] * Ratio;
-            yPosOffset += Direction[1] * Ratio;
-            zPosOffset += Direction[2] * Ratio;
+
+            Vector Direction = child.Position.vectorToo(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
+            // -= because the direction is pointing the wrong way as its Child to COM not COM to child
+            xPosOffset -= Direction.x * Ratio;
+            yPosOffset -= Direction.y * Ratio;
+            zPosOffset -= Direction.z * Ratio;
             newMass += child.Mass;
         }
         Vector newCOM = new Vector(this.Center.x + (long)Math.Round(xPosOffset), this.Center.y + (long)Math.Round(yPosOffset), this.Center.z + (long)Math.Round(zPosOffset));
@@ -661,20 +682,26 @@ public class BVolume : Volume
 
         mass[] influencesArray = Influences.ToArray();
 
-        foreach (Body body in MChildren)
+        foreach (Body body in allChildren)
         {
             body.calculateManyForce(influencesArray);
-            if (!this.withinBoundaries(body.COM))
-            {
-                this.Parent.injestBody(body);
-            }
         }
-        foreach (Body body in NMChildren)
+
+        foreach (Body body in allChildren)
         {
-            body.calculateManyForce(influencesArray);
             if (!this.withinBoundaries(body.COM))
             {
+                globalVariables.log.LogTrace($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
+                Console.WriteLine($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
                 this.Parent.injestBody(body);
+                if (body.Massive)
+                {
+                    this.MChildren.Remove(body);
+                }
+                else
+                {
+                    this.NMChildren.Remove(body);
+                }
             }
         }
     }
@@ -684,6 +711,7 @@ public class BVolume : Volume
     {
         if (this.withinBoundaries(newBody.Position))
         {
+            Console.WriteLine($"{this.idToString()} Ingesting {newBody.idToString()}");
             if (newBody.Massive)
             {
                 MChildren.Add(newBody);
@@ -718,7 +746,7 @@ public class RVolume : Volume
         this.Center = new Vector(0, 0, 0);
         this.COM = Center;
         this.Timestep = 0;
-        // length of each axis must be atleast numberVolumeSplits^2 as we need Avolume and BVolume layer below RVolume
+        // length of each axis must be atleast numberVolumeSplits*RVolumeSplits as we need Avolume and BVolume layer below RVolume
         // Length of each axis must be at MOST half the max value of long
         if (xlen*BVMagnitude > Int64.MaxValue / 2 | ylen*BVMagnitude > Int64.MaxValue / 2 | zlen*BVMagnitude > Int64.MaxValue / 2)
         {
@@ -733,7 +761,7 @@ public class RVolume : Volume
         this.upperZBound = Convert.ToInt64(BVMagnitude*Math.Ceiling(Convert.ToDouble(zlen) / 2));
         this.Parent = this;
 
-        globalVariables.log.LogTrace($"RVolume begining child creation with bounds {lowerXBound}, {upperXBound}, {lowerYBound}, {upperYBound}, {lowerZBound}, {upperZBound}");
+        globalVariables.log.LogTrace($"RVolume begining child creation with bounds {lowerXBound}, {lowerYBound}, {lowerZBound}, {upperXBound}, {upperYBound}, {upperZBound}");
 
 
         List<long>[] boundaries = calculateChildVolumePositions(BVMagnitude, RVolumeSplits, out BVolumes);
@@ -838,6 +866,7 @@ public class RVolume : Volume
     {
         return this;
     }
+
 
     // public override List<BVolume> getBVolumes()
     // {
@@ -1027,6 +1056,20 @@ public class Body : mass
         Position = new dynamicPosition(x, y, z, xvel, yvel, zvel);
     }
 
+    public override string ToString()
+    {
+        if (this.Parent != null)
+        {
+            return $"{this.id} Body child of {this.Parent.idToString()} at {this.Position}, {this.Mass}, {this.Massive}, {this.Radius}";
+        }
+        return $"{this.id} Body at {this.Position}, {this.Mass}, {this.Massive}, {this.Radius}";
+    }
+
+    public string idToString()
+    {
+        return $"Body {this.id}";
+    }
+
     public void applyForceNewtons(double forcex, double forcey, double forcez)
     {
         long velx = (long)(forcex / Mass);
@@ -1044,7 +1087,7 @@ public class Body : mass
     public void calculateManyForce(mass[] influences)
     {
         // Will calculate the gravitational attraction from many masses, Skips some steps to directly calculting velocity change instead of forces
-        Console.WriteLine($"Body calculating forces from {influences.Length} objects");
+        globalVariables.log.LogTrace($"{this.ToString()} calculating forces from {influences.Length} objects");
         decimal velx = 0;
         decimal vely = 0;
         decimal velz = 0;
@@ -1058,31 +1101,34 @@ public class Body : mass
             {
                 continue;
             }
+            // Move this check to BVolume Influence list construction once testing is done
+            if (influence.Mass == 0)
+            {
+                continue;
+            }
+
+
+
             unitDir = this.COM.unitVectorToo(influence.COM);
             magnitude = (double)this.COM.distanceToo(influence.COM);
             // Important that the type case to decimal happens AFTER the division as otherwise mass is allowed to be above the limit 
             // TODO There should be a check here that magnitude isnt too low
-            force = checked(globalVariables.grav_const * (decimal)(influence.Mass / Math.Pow(magnitude/globalVariables.Units_in_M, 2)));
+            force = checked(globalVariables.grav_const * (decimal)(influence.Mass / Math.Pow(magnitude / globalVariables.Units_in_M, 2)));
 
             velx += force * unitDir[0];
             vely += force * unitDir[1];
             velz += force * unitDir[2];
 
-            //Console.WriteLine($"{influence.ToString()}");
-            // Console.WriteLine($"{force}");
-            // Console.WriteLine($"{magnitude}");
-            // Console.WriteLine($"{(decimal)(influence.Mass / Math.Pow(magnitude, 2))}");
+            //Console.WriteLine($"Influence Found: {influence.ToString()}");
+            //Console.WriteLine($"{force}");
         }
-        Console.WriteLine($"{velx} {vely} {velz}");
+        //Console.WriteLine($"{velx} {vely} {velz}");
         applyVeloc((long)Math.Round(velx), (long)Math.Round(vely), (long)Math.Round(velz));
-        Console.WriteLine(this.ToString());
+
         this.Position.update();
+        //Console.WriteLine($"After Update: {this.ToString()}");
     }
     
-    public override string ToString()
-    {
-        return $"{this.id} Body child of {this.Parent} at {this.Position}, {this.Mass}, {this.Massive}, {this.Radius}";
-    }
 }
 
 public interface updateAble
