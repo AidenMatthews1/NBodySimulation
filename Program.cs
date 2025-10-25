@@ -8,18 +8,36 @@ using System.Diagnostics;
 
 Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToString()}");
 
-RVolume test = new RVolume(100 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
-Body body1 = new Body((double)Math.Pow(10,15), 190000, 0, 0);
-Body body2 = new Body(1, 0, 0, 0);
-test.injestBody(body1);
-test.injestBody(body2);
-test.initialise();
-Console.WriteLine(test.ToString());
-Console.WriteLine(body1.ToString());
-Console.WriteLine(body2.ToString());
+RVolume root = new RVolume(100 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
+// Body body1 = new Body((double)Math.Pow(10,15), 190000, 0, 0);
+// Body body2 = new Body(1, 0, 0, 0);
+// test.injestBody(body1);
+// test.injestBody(body2);
+
+IEnumerable<string> rows = File.ReadLines("bodies.csv");
+
+foreach (string row in rows)
+{
+    string[] values = row.Split(',');
+    if (values.Length != 7)
+    {
+        throw new ArgumentException($"CSV Row was the wrong size {values.Length}");
+    }
+    else
+    {
+        root.injestBody(new Body(Convert.ToDouble(values[0]), long.Parse(values[1]), long.Parse(values[2]), long.Parse(values[3]), long.Parse(values[4]), long.Parse(values[5]), long.Parse(values[6])));
+
+    }
+}
+
+
+root.initialise();
+Console.WriteLine(root.ToString());
+// Console.WriteLine(body1.ToString());
+// Console.WriteLine(body2.ToString());
 
 var watch = Stopwatch.StartNew();
-test.updateMany(100);
+root.updateMany(4600);
 watch.Stop();
 Console.WriteLine("Claimed time:");
 Console.WriteLine(watch.ElapsedMilliseconds.ToString());
@@ -57,9 +75,10 @@ public class positioningException : System.Exception
 
 public class Vector
 {
-    public Int64 x { get; protected set; }
-    public Int64 y { get; protected set; }
-    public Int64 z { get; protected set; }
+    //TODO a better design would have these sets protected
+    public Int64 x { get; set; }
+    public Int64 y { get; set; }
+    public Int64 z { get; set; }
 
     public Vector(Int64 xpos, Int64 ypos, Int64 zpos)
     {
@@ -140,9 +159,10 @@ public class Vector
 
 public class dynamicPosition : Vector, updateAble
 {
-    public Int64 xvel { get; protected set; }
-    public Int64 yvel { get; protected set; }
-    public Int64 zvel { get; protected set; }
+    // TODO a better design here would have protected sets (Easy to do by changing RVolume injest from direct edit to setVel())
+    public Int64 xvel { get; set; }
+    public Int64 yvel { get; set; }
+    public Int64 zvel { get; set; }
     //public float magnitudeVel { get { return calcMagnitude(); } protected set; }
 
     public dynamicPosition(Int64 xpos, Int64 ypos, Int64 zpos) : base(xpos, ypos, zpos)
@@ -692,7 +712,6 @@ public class BVolume : Volume
             if (!this.withinBoundaries(body.COM))
             {
                 globalVariables.log.LogTrace($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
-                Console.WriteLine($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
                 this.Parent.injestBody(body);
                 if (body.Massive)
                 {
@@ -711,7 +730,7 @@ public class BVolume : Volume
     {
         if (this.withinBoundaries(newBody.Position))
         {
-            Console.WriteLine($"{this.idToString()} Ingesting {newBody.idToString()}");
+            globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
             if (newBody.Massive)
             {
                 MChildren.Add(newBody);
@@ -823,26 +842,65 @@ public class RVolume : Volume
 
     public override void injestBody(Body newBody)
     {
-        if (this.withinBoundaries(newBody.Position))
+        if (!this.withinBoundaries(newBody.Position))
         {
-            AVolume targetChild = Children.First();
-            decimal distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+             // One or more of the Bodies position values are outside the boundaries. Will edit the relevant ones to be within boundaries
+            globalVariables.log.LogTrace("RVolume was asked to injest a body outside its limits");
 
-            foreach (AVolume child in Children)
+            if (newBody.Position.x > this.upperXBound)
             {
-                if (newBody.Position.distanceToo(child.Center) < distanceTooTarget)
+                newBody.Position.x = upperXBound - 1;
+                newBody.Position.xvel -= 1;
+            }
+            else
+            {
+                if (newBody.Position.x < this.lowerXBound)
                 {
-                    targetChild = child;
-                    distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+                    newBody.Position.x = lowerXBound + 1;
+                    newBody.Position.xvel += 1;
                 }
             }
-            targetChild.injestBody(newBody);
+            if (newBody.Position.y > this.upperYBound)
+            {
+                newBody.Position.y = upperYBound - 1;
+                newBody.Position.yvel -= 1;
+            }
+            else
+            {
+                if (newBody.Position.y < this.lowerYBound)
+                {
+                    newBody.Position.y = lowerYBound + 1;
+                    newBody.Position.yvel += 1;
+                }
+            }
+            if (newBody.Position.z > this.upperZBound)
+            {
+                newBody.Position.z = upperZBound - 1;
+                newBody.Position.zvel -= 1;
+            }
+            else
+            {
+                if (newBody.Position.z < this.lowerZBound)
+                {
+                    newBody.Position.z = lowerZBound + 1;
+                    newBody.Position.zvel += 1;
+                }
+            }
         }
-        else
+
+        AVolume targetChild = Children.First();
+        decimal distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+
+        foreach (AVolume child in Children)
         {
-            // TODO this should concat body position to be within limits and write to log
-            throw new ArgumentException("RVolume was asked to injest a body outside its limits");
+            if (newBody.Position.distanceToo(child.Center) < distanceTooTarget)
+            {
+                targetChild = child;
+                distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+            }
         }
+        targetChild.injestBody(newBody);
+
     }
 
     public override void update()

@@ -8,17 +8,17 @@ namespace Globals
         public static int seconds_per_timestep = 60;
         public static decimal max_angle_initialisation = (decimal)1;
 
-        public static double min_massive_weight = 100;
+        public static double min_massive_weight = 100000000;
         public const long M_in_Lsecond = 299792458;
         public const decimal grav_const = (decimal)0.000000000066743;
-        public static  Microsoft.Extensions.Logging.LogLevel Level = Microsoft.Extensions.Logging.LogLevel.Information;
+        public static  Microsoft.Extensions.Logging.LogLevel Level = Microsoft.Extensions.Logging.LogLevel.Trace;
         public static ILogger log = new Logger().log;
     }
 
     public class Logger
     {
         public ILogger log { get; private set; }
-        public static Microsoft.Extensions.Logging.LogLevel Level = Microsoft.Extensions.Logging.LogLevel.Information;
+        public static Microsoft.Extensions.Logging.LogLevel Level = Microsoft.Extensions.Logging.LogLevel.Trace;
 
         public Logger() {
             using var loggerFactory = LoggerFactory.Create(builder =>
