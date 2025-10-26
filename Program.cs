@@ -888,7 +888,7 @@ public class RVolume : Volume
         if (!this.withinBoundaries(newBody.Position))
         {
              // One or more of the Bodies position values are outside the boundaries. Will edit the relevant ones to be within boundaries
-            globalVariables.log.LogTrace("RVolume was asked to injest a body outside its limits");
+            //globalVariables.log.LogTrace("RVolume was asked to injest a body outside its limits");
 
             if (newBody.Position.x > this.upperXBound)
             {
