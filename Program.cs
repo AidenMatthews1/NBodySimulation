@@ -36,7 +36,7 @@ globalVariables.log.LogInformation(root.ToString());
 // Console.WriteLine(body2.ToString());
 
 var watch = Stopwatch.StartNew();
-root.updateMany(10000);
+root.updateMany(1000);
 watch.Stop();
 Console.WriteLine("Claimed time:");
 Console.WriteLine(watch.ElapsedMilliseconds.ToString());
