@@ -8,6 +8,12 @@ using System.Threading;
 
 Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToString()}");
 
+//if (!ThreadPool.SetMaxThreads(1, 1)) Console.WriteLine("Threadpool not listening");
+
+//public static WaitHandle[] waitHandles = new WaitHandle[numThreads];
+
+
+
 RVolume root = new RVolume(1000000 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
 // Body body1 = new Body((double)Math.Pow(10,15), 190000, 0, 0);
 // Body body2 = new Body(1, 0, 0, 0);
@@ -248,7 +254,8 @@ public abstract class Volume : updateAble, mass
     public Vector COM { get; protected set; }
     public double Mass { get; protected set; }
 
-    public Guid id {get; protected set;}
+    public Guid id { get; protected set; }
+    public int Timestep { get; protected set; }
 
 
     protected Volume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound)
@@ -298,6 +305,27 @@ public abstract class Volume : updateAble, mass
         return $"{this.GetType().ToString()} {this.id.ToString()}";
     }
 
+// will spin until the number of threads being used <= input int
+    public void activeThreadWaiter(int numActiveThreads)
+    {
+        while (true)
+        {
+            int placeholder = 0;
+            int maxThreads = 0;
+            int availThreads = 0;
+            ThreadPool.GetMaxThreads(out maxThreads, out placeholder);
+            ThreadPool.GetAvailableThreads(out availThreads, out placeholder);
+            //Console.WriteLine((maxThreads - availThreads).ToString());
+
+            //Console.WriteLine(maxThreads.ToString());
+            //Console.WriteLine(availThreads.ToString());
+            if (maxThreads - availThreads <= numActiveThreads)
+            {
+                return;
+            }
+        }
+    }
+
     public virtual RVolume getRoot()
     {
         return Parent.getRoot();
@@ -329,10 +357,10 @@ public abstract class Volume : updateAble, mass
         return false;
     }
 
-    public virtual void updateMajor(int timestep)
+    public virtual void updateMajor()
     {
         updateCOM();
-        update(timestep);
+        update();
     }
 
     protected virtual List<long>[] calculateChildVolumePositions(long BVMagnitude, byte numAxisSplits, out bool BVolumes)
@@ -462,7 +490,9 @@ public abstract class Volume : updateAble, mass
 
     //public abstract int numBodies();
 
-    public abstract void update(int timestep);
+    public abstract void update();
+
+    public abstract void updateCleanup();
 
     public abstract void updateCOM();
 }
@@ -704,8 +734,9 @@ public class BVolume : Volume
 
     }
 
-    public override void update(int timestep)
+    public override void update()
     {
+        int timestep = Parent.Timestep;
         // Find mass array
         // TODO Would be good to allocate array size at the start instead of dynamically resizing for every new list but that would add complexity we dont need in MVP
         // TODO can likely save simplified interactions as flat veloc applications that get updated on a Major Instead of getting every body to calculate them every time
@@ -742,11 +773,6 @@ public class BVolume : Volume
                 }
             }
         }
-
-        foreach  (Body body in futureChildren)
-        {
-            this.injestBody(body);
-        }
     }
 
 
@@ -766,7 +792,7 @@ public class BVolume : Volume
         }
         else
         {
-            Parent.injestBody(newBody);
+            Parent.injestBody(newBody, timestep);
         }
     }
 
@@ -788,6 +814,13 @@ public class BVolume : Volume
         else
         {
             Parent.injestBody(newBody);
+        }
+    }
+    public override void updateCleanup()
+    {
+        foreach  (Body body in futureChildren)
+        {
+            this.injestBody(body);
         }
     }
 
@@ -952,24 +985,35 @@ public class RVolume : Volume
         injestBody(newBody);
     }
 
-    public override void update(int throwaway)
+    public override void update()
     {
-        
-        foreach (Volume child in Children)
+
+        foreach (AVolume child in Children)
         {
-            child.update(Timestep);
+            //ThreadPool.QueueUserWorkItem(new WaitCallback(child.update()));
+            child.threadedUpdate();
         }
+        // wait for all threads to complete
+        activeThreadWaiter(0);
         Timestep += 1;
     }
 
-    public void update()
+    public override void updateCleanup()
     {
-        foreach (Volume child in Children)
+        foreach (AVolume child in Children)
         {
-            child.update(Timestep);
+            child.updateCleanup();
         }
-        Timestep += 1;
     }
+
+    // public void update()
+    // {
+    //     foreach (Volume child in Children)
+    //     {
+    //         child.update(Timestep);
+    //     }
+    //     Timestep += 1;
+    // }
 
 
     public void updateMany(int numUpdates)
@@ -1019,6 +1063,8 @@ public class AVolume : Volume
 {
     public List<Volume> Children { get; private set; }
 
+    public int Timestep {get { return Parent.Timestep; }}
+
     public AVolume(Volume cParent, long BVMagnitude, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound, byte numAxisSplits) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
         // Base constructor handles Base Fields this constructor is mostly for creating children
@@ -1051,7 +1097,15 @@ public class AVolume : Volume
                     }
                 }
             }
-        }    
+        }
+    }
+
+    public override void updateCleanup()
+    {
+        foreach (Volume child in Children)
+        {
+            child.updateCleanup();
+        }
     }
     
     // public List<BVolume> getBVolumes()
@@ -1146,12 +1200,23 @@ public class AVolume : Volume
         return containedBodies;
     }
 
-    public override void update(int timestep)
+    public override void update()
     {
         foreach (Volume child in Children)
         {
-            child.update(timestep);
+            child.update();
         }
+    }
+
+    public void update(object state)
+    {
+        update();
+    }
+
+    public void threadedUpdate()
+    {
+        activeThreadWaiter(globalVariables.threads);
+        ThreadPool.QueueUserWorkItem(new WaitCallback(update), null);
     }
 }
 
@@ -1284,8 +1349,8 @@ public class Body : mass
 
 public interface updateAble
 {
-    public void update(int timestep);
-    public void updateMajor(int timestep);
+    public void update();
+    public void updateMajor();
 }
 
 public interface mass

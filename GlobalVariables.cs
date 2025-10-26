@@ -13,6 +13,10 @@ namespace Globals
         public const decimal grav_const = (decimal)0.000000000066743;
         public static  Microsoft.Extensions.Logging.LogLevel Level = Microsoft.Extensions.Logging.LogLevel.Information;
         public static ILogger log = new Logger().log;
+
+        public static List<WaitHandle> waitHandles = new List<WaitHandle>();
+
+        public static int threads = 2;
     }
 
     public class Logger
