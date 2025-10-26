@@ -4,7 +4,6 @@ using Globals;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
-using System.Threading;
 
 Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToString()}");
 
@@ -755,13 +754,13 @@ public class BVolume : Volume
         if (this.withinBoundaries(newBody.Position))
         {
             globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
-            if (timestep > lastTimestep)
+            if (timestep >= lastTimestep)
             {
-                futureChildren.Add(newBody);   
+                this.injestBody(newBody);
             }
             else
             {
-                this.injestBody(newBody);
+                futureChildren.Add(newBody);   
             }
         }
         else
@@ -954,7 +953,6 @@ public class RVolume : Volume
 
     public override void update(int throwaway)
     {
-        
         foreach (Volume child in Children)
         {
             child.update(Timestep);
