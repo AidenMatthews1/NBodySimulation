@@ -43,7 +43,7 @@ globalVariables.log.LogInformation(root.ToString());
 // Console.WriteLine(body2.ToString());
 
 var watch = Stopwatch.StartNew();
-root.updateMany(10000);
+root.updateMany(1000);
 watch.Stop();
 Console.WriteLine("Claimed time:");
 Console.WriteLine(watch.ElapsedMilliseconds.ToString());
@@ -761,7 +761,7 @@ public class BVolume : Volume
             body.update();
             if (!this.withinBoundaries(body.COM))
             {
-                globalVariables.log.LogTrace($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
+                //globalVariables.log.LogTrace($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
                 this.Parent.injestBody(body, timestep);
                 if (body.Massive)
                 {
@@ -783,11 +783,11 @@ public class BVolume : Volume
             globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
             if (timestep > lastTimestep)
             {
-                futureChildren.Add(newBody);   
+                this.injestBody(newBody);
             }
             else
             {
-                this.injestBody(newBody);
+                futureChildren.Add(newBody);   
             }
         }
         else
@@ -1215,7 +1215,7 @@ public class AVolume : Volume
 
     public void threadedUpdate()
     {
-        activeThreadWaiter(globalVariables.threads);
+        activeThreadWaiter(globalVariables.threads - 1);
         ThreadPool.QueueUserWorkItem(new WaitCallback(update), null);
     }
 }
