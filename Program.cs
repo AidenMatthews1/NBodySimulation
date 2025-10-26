@@ -43,7 +43,7 @@ globalVariables.log.LogInformation(root.ToString());
 // Console.WriteLine(body2.ToString());
 
 var watch = Stopwatch.StartNew();
-root.updateMany(1000);
+root.updateMany(10000);
 watch.Stop();
 Console.WriteLine("Claimed time:");
 Console.WriteLine(watch.ElapsedMilliseconds.ToString());
@@ -509,9 +509,11 @@ public class BVolume : Volume
     public List<Body> MChildren { get; set; }
 
     // there needs to be a better way of doing this
-    private List<Body> allChildren { get { List<Body> temp = new List<Body>(); temp.AddRange(MChildren); temp.AddRange(NMChildren); return temp; } }
+    private List<Body> allChildren { get { return this.getContainedBodies(); } }
 
     public List<Body> futureChildren { get; protected set; }
+
+    private List<Body> markedForRelease;
 
     public int lastTimestep;
 
@@ -521,6 +523,7 @@ public class BVolume : Volume
         MChildren = new List<Body>();
         NMChildren = new List<Body>();
         futureChildren = new List<Body>();
+        markedForRelease = new List<Body>();
         globalVariables.log.LogTrace($"BVolume constructed: {this.ToString()}");
         lastTimestep = 0;
     }
@@ -763,15 +766,7 @@ public class BVolume : Volume
             if (!this.withinBoundaries(body.COM))
             {
                 //globalVariables.log.LogTrace($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
-                this.Parent.injestBody(body, timestep);
-                if (body.Massive)
-                {
-                    this.MChildren.Remove(body);
-                }
-                else
-                {
-                    this.NMChildren.Remove(body);
-                }
+                this.markedForRelease.Add(body);
             }
         }
     }
@@ -821,12 +816,26 @@ public class BVolume : Volume
     }
     public override void updateCleanup()
     {
+        foreach (Body body in markedForRelease)
+        {
+            this.Parent.injestBody(body);
+            if (body.Massive)
+            {
+                this.MChildren.Remove(body);
+            }
+            else
+            {
+                this.NMChildren.Remove(body);
+            }
+        }
+        
         foreach (Body body in futureChildren)
         {
             //Console.WriteLine("Made it here");
             this.injestBody(body);
         }
         futureChildren = new List<Body>();
+        markedForRelease = new List<Body>();
     }
 
 }

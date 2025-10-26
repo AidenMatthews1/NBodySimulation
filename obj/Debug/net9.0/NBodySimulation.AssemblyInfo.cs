@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NBodySimulation")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+452b852f1348cedbb55ba038f70c3f9b69c4c208")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0a91e62dfc1b7e131ca0cb17f195b348c107526d")]
 [assembly: System.Reflection.AssemblyProductAttribute("NBodySimulation")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NBodySimulation")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
