@@ -683,6 +683,7 @@ public class BVolume : Volume
         List<Body> Children = new List<Body>();
         Children.AddRange(NMChildren);
         Children.AddRange(MChildren);
+        Children.AddRange(futureChildren);
         return Children;
     }
 
@@ -775,9 +776,9 @@ public class BVolume : Volume
         }
     }
 
-
     public override void injestBody(Body newBody, int timestep)
     {
+
         if (this.withinBoundaries(newBody.Position))
         {
             globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
@@ -800,7 +801,9 @@ public class BVolume : Volume
     {
         if (this.withinBoundaries(newBody.Position))
         {
-            globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
+            //Console.WriteLine("Made it here");
+
+            //globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
             if (newBody.Massive)
             {
                 MChildren.Add(newBody);
@@ -818,10 +821,12 @@ public class BVolume : Volume
     }
     public override void updateCleanup()
     {
-        foreach  (Body body in futureChildren)
+        foreach (Body body in futureChildren)
         {
+            //Console.WriteLine("Made it here");
             this.injestBody(body);
         }
+        futureChildren = new List<Body>();
     }
 
 }
@@ -921,7 +926,7 @@ public class RVolume : Volume
     {
         if (!this.withinBoundaries(newBody.Position))
         {
-             // One or more of the Bodies position values are outside the boundaries. Will edit the relevant ones to be within boundaries
+            // One or more of the Bodies position values are outside the boundaries. Will edit the relevant ones to be within boundaries
             globalVariables.log.LogTrace("RVolume was asked to injest a body outside its limits");
 
             if (newBody.Position.x > this.upperXBound)
@@ -964,7 +969,7 @@ public class RVolume : Volume
                 }
             }
         }
-
+        
         AVolume targetChild = Children.First();
         decimal distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
 
@@ -977,7 +982,6 @@ public class RVolume : Volume
             }
         }
         targetChild.injestBody(newBody, Timestep);
-
     }
 
     public override void injestBody(Body newBody, int timestep)
@@ -996,6 +1000,12 @@ public class RVolume : Volume
         // wait for all threads to complete
         activeThreadWaiter(0);
         Timestep += 1;
+
+        foreach (AVolume child in Children)
+        {
+            child.updateCleanup();
+        }
+        //Console.WriteLine(this.getContainedBodies().Count());
     }
 
     public override void updateCleanup()
@@ -1169,6 +1179,7 @@ public class AVolume : Volume
 
     public override void injestBody(Body newBody, int timestep)
     {
+
         if (this.withinBoundaries(newBody.Position))
         {
             Volume targetChild = Children.First();
@@ -1210,7 +1221,7 @@ public class AVolume : Volume
 
     public void update(object state)
     {
-        update();
+        this.update();
     }
 
     public void threadedUpdate()
