@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 Console.WriteLine($"Starting Program with Log Level: {globalVariables.Level.ToString()}");
 
-RVolume root = new RVolume(100 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
+RVolume root = new RVolume(1000000 * globalVariables.Units_in_M, 4, 4, 4, 2, 2);
 // Body body1 = new Body((double)Math.Pow(10,15), 190000, 0, 0);
 // Body body2 = new Body(1, 0, 0, 0);
 // test.injestBody(body1);
@@ -186,7 +186,17 @@ public class dynamicPosition : Vector, updateAble
         this.z += this.zvel;
     }
 
+    public void update(int timestep)
+    {
+        this.update();
+    }
+
     public void updateMajor()
+    {
+        update();
+    }
+
+    public void updateMajor(int timestep)
     {
         update();
     }
@@ -318,10 +328,10 @@ public abstract class Volume : updateAble, mass
         return false;
     }
 
-    public virtual void updateMajor()
+    public virtual void updateMajor(int timestep)
     {
         updateCOM();
-        update();
+        update(timestep);
     }
 
     protected virtual List<long>[] calculateChildVolumePositions(long BVMagnitude, byte numAxisSplits, out bool BVolumes)
@@ -445,12 +455,13 @@ public abstract class Volume : updateAble, mass
     public abstract void initialise();
 
     public abstract void injestBody(Body newBody);
+    public abstract void injestBody(Body newBody, int timestep);
 
     public abstract List<Body> getContainedBodies();
 
     //public abstract int numBodies();
 
-    public abstract void update();
+    public abstract void update(int timestep);
 
     public abstract void updateCOM();
 }
@@ -469,12 +480,18 @@ public class BVolume : Volume
     // there needs to be a better way of doing this
     private List<Body> allChildren { get { List<Body> temp = new List<Body>(); temp.AddRange(MChildren); temp.AddRange(NMChildren); return temp; } }
 
+    public List<Body> futureChildren { get; protected set; }
+
+    public int lastTimestep;
+
     public BVolume(Volume cParent, long LowerXBound, long UpperXBound, long LowerYBound, long UpperYBound, long LowerZBound, long UpperZBound) : base(cParent, LowerXBound, UpperXBound, LowerYBound, UpperYBound, LowerZBound, UpperZBound)
     {
         //globalVariables.log.LogTrace($"BVolume constructor called with boundaries  {LowerXBound},  {UpperXBound},  {LowerYBound},  {UpperYBound},  {LowerZBound},  {UpperZBound}");
         MChildren = new List<Body>();
         NMChildren = new List<Body>();
+        futureChildren = new List<Body>();
         globalVariables.log.LogTrace($"BVolume constructed: {this.ToString()}");
+        lastTimestep = 0;
     }
 
     public override void initialise()
@@ -686,7 +703,7 @@ public class BVolume : Volume
 
     }
 
-    public override void update()
+    public override void update(int timestep)
     {
         // Find mass array
         // TODO Would be good to allocate array size at the start instead of dynamically resizing for every new list but that would add complexity we dont need in MVP
@@ -708,10 +725,12 @@ public class BVolume : Volume
 
         foreach (Body body in allChildren)
         {
+            // applies the velocity to the position
+            body.update();
             if (!this.withinBoundaries(body.COM))
             {
                 globalVariables.log.LogTrace($"{this.idToString()} giving up {body.ToString()} as outside boundaries");
-                this.Parent.injestBody(body);
+                this.Parent.injestBody(body, timestep);
                 if (body.Massive)
                 {
                     this.MChildren.Remove(body);
@@ -722,8 +741,33 @@ public class BVolume : Volume
                 }
             }
         }
+
+        foreach  (Body body in futureChildren)
+        {
+            this.injestBody(body);
+        }
     }
 
+
+    public override void injestBody(Body newBody, int timestep)
+    {
+        if (this.withinBoundaries(newBody.Position))
+        {
+            globalVariables.log.LogTrace($"{this.idToString()} Ingesting {newBody.idToString()}");
+            if (timestep >= lastTimestep)
+            {
+                this.injestBody(newBody);
+            }
+            else
+            {
+                futureChildren.Add(newBody);   
+            }
+        }
+        else
+        {
+            Parent.injestBody(newBody);
+        }
+    }
 
     public override void injestBody(Body newBody)
     {
@@ -898,18 +942,33 @@ public class RVolume : Volume
                 distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
             }
         }
-        targetChild.injestBody(newBody);
+        targetChild.injestBody(newBody, Timestep);
 
     }
 
-    public override void update()
+    public override void injestBody(Body newBody, int timestep)
+    {
+        injestBody(newBody);
+    }
+
+    public override void update(int throwaway)
     {
         foreach (Volume child in Children)
         {
-            child.update();
+            child.update(Timestep);
         }
         Timestep += 1;
     }
+
+    public void update()
+    {
+        foreach (Volume child in Children)
+        {
+            child.update(Timestep);
+        }
+        Timestep += 1;
+    }
+
 
     public void updateMany(int numUpdates)
     {
@@ -1052,6 +1111,29 @@ public class AVolume : Volume
         }
     }
 
+    public override void injestBody(Body newBody, int timestep)
+    {
+        if (this.withinBoundaries(newBody.Position))
+        {
+            Volume targetChild = Children.First();
+            decimal distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+
+            foreach (Volume child in Children)
+            {
+                if (newBody.Position.distanceToo(child.Center) < distanceTooTarget)
+                {
+                    targetChild = child;
+                    distanceTooTarget = newBody.Position.distanceToo(targetChild.Center);
+                }
+            }
+            targetChild.injestBody(newBody, timestep);
+        }
+        else
+        {
+            Parent.injestBody(newBody, timestep);
+        }
+    }
+
     public override List<Body> getContainedBodies()
     {
         List<Body> containedBodies = new List<Body>();
@@ -1062,11 +1144,11 @@ public class AVolume : Volume
         return containedBodies;
     }
 
-    public override void update()
+    public override void update(int timestep)
     {
         foreach (Volume child in Children)
         {
-            child.update();
+            child.update(timestep);
         }
     }
 }
@@ -1154,7 +1236,7 @@ public class Body : mass
     public void calculateManyForce(mass[] influences)
     {
         // Will calculate the gravitational attraction from many masses, Skips some steps to directly calculting velocity change instead of forces
-        globalVariables.log.LogTrace($"{this.ToString()} calculating forces from {influences.Length} objects");
+        //globalVariables.log.LogTrace($"{this.ToString()} calculating forces from {influences.Length} objects");
         decimal velx = 0;
         decimal vely = 0;
         decimal velz = 0;
@@ -1189,19 +1271,19 @@ public class Body : mass
             //Console.WriteLine($"Influence Found: {influence.ToString()}");
             //Console.WriteLine($"{force}");
         }
-        //Console.WriteLine($"{velx} {vely} {velz}");
         applyVeloc((long)Math.Round(velx), (long)Math.Round(vely), (long)Math.Round(velz));
-
-        this.Position.update();
-        //Console.WriteLine($"After Update: {this.ToString()}");
     }
     
+    public void update()
+    {
+        this.Position.update();
+    }
 }
 
 public interface updateAble
 {
-    public void update();
-    public void updateMajor();
+    public void update(int timestep);
+    public void updateMajor(int timestep);
 }
 
 public interface mass
