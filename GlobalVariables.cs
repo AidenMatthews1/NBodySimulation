@@ -16,7 +16,7 @@ namespace Globals
 
         public static List<WaitHandle> waitHandles = new List<WaitHandle>();
 
-        public static int threads = 2;
+        public static int threads = 6;
     }
 
     public class Logger
